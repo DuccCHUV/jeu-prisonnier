@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Modérateur - Prisonnier</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    :root { --bg: #0f0f1a; --card: #1a1a2e; --accent: #4a90e2; --text: #e0e0e0; --green: #2ecc71; --red: #e74c3c; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: url('image.jpg') center center / cover no-repeat fixed; color: var(--text); font-family: 'Segoe UI', sans-serif; padding: 2rem; display: flex; flex-direction: column; gap: 2rem; min-height: 100vh; position: relative; }
+    body::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 15, 26, 0.7); z-index: -1; }
+    .card { background: rgba(26, 26, 46, 0.92); backdrop-filter: blur(12px); border-radius: 16px; padding: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 900px; margin: 0 auto; border: 1px solid rgba(74, 144, 226, 0.2); z-index: 1; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    select, button { width: 100%; padding: 0.9rem; border-radius: 8px; border: none; margin-bottom: 1rem; font-size: 1rem; }
+    select { background: #333; color: white; }
+    button { background: var(--accent); color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    button:hover:not(:disabled) { background: #357abd; transform: scale(1.02); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.roundBtn { background: var(--green); font-size: 1.2rem; padding: 1.2rem; margin-top: 1.5rem; }
+    .score-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 1rem; }
+    .score-table th, .score-table td { padding: 0.8rem; text-align: center; border-bottom: 1px solid #444; }
+    .score-table th { background: #222; }
+    .live { color: var(--green); font-weight: bold; }
+    .waiting { color: #f39c12; font-weight: bold; text-align: center; margin-top: 0.5rem; }
+    .btn-group { display: flex; gap: 1rem; margin-top: 1rem; }
+    .btn-group button { flex: 1; }
+    .btn-group button.reset { background: var(--red); }
+    .chart-container { background: rgba(26, 26, 46, 0.95); border-radius: 12px; padding: 1rem; backdrop-filter: blur(10px); border: 1px solid rgba(74, 144, 226, 0.2); height: 380px; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Scores en Direct <span class="live">Live</span></h1>
+    <p style="text-align:center;">Ronde <span id="currentRound">—</span> / <span id="totalRounds">—</span></p>
+    <p id="votesStatus" class="waiting">En attente du lancement...</p>
+    <table class="score-table">
+      <thead><tr><th>Nom</th><th>Points Ronde</澫><th>Total</th></tr></thead>
+      <tbody id="resultsTable"></tbody>
+    </table>
+    <div class="chart-container"><canvas id="scoresChart"></canvas></div>
+    <button id="roundControlBtn" class="roundBtn" disabled>Lancer Ronde</button>
+  </div>
+
+  <div class="card">
+    <h1>Configuration du Jeu</h1>
+    <label>Joueurs (pair)</label>
+    <select id="numPlayers"><option value="2">2</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="10">10</option></select>
+    <label>Rondes</label>
+    <select id="numRounds"><script>for(let i=10;i<=50;i+=5)document.write(`<option value="${i}">${i}</option>`);</script></select>
+    <div class="btn-group">
+      <button onclick="saveConfig()">Configurer</button>
+      <button class="reset" onclick="resetAll()">Réinitialiser</button>
+    </div>
+    <p id="status" style="text-align:center; margin-top:1rem;">En attente de configuration...</p>
+  </div>
+
+  <script>
+    // TUO CONFIG FIREBASE
+    const firebaseConfig = {
+      apiKey: "AIzaSyBREaX2qwor0mO6Q4xAVOVERuQmYYeKWfw",
+      authDomain: "jeu-prisonnier.firebaseapp.com",
+      databaseURL: "https://jeu-prisonnier-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "jeu-prisonnier",
+      storageBucket: "jeu-prisonnier.firebasestorage.app",
+      messagingSenderId: "165842620681",
+      appId: "1:165842620681:web:0f57a9d473810031ba83d8"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const payoffs = { 'CC': 3, 'CD': 0, 'DC': 5, 'DD': 1 };
+    let scoresChart = null;
+
+    function saveConfig() {
+      const players = parseInt(document.getElementById('numPlayers').value);
+      const rounds = parseInt(document.getElementById('numRounds').value);
+      if (players % 2 !== 0) return alert("Nombre de joueurs doit être pair !");
+
+      const ids = Array.from({length: players}, (_, i) => i + 1);
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      const paires = {};
+      for (let i = 0; i < ids.length; i += 2) {
+        paires[ids[i]] = ids[i + 1];
+        paires[ids[i + 1]] = ids[i];
+      }
+
+      const newState = { round: 1, scores: {}, paires, names: {}, usedIds: [], votes: {}, roundStarted: false };
+      for (let i = 1; i <= players; i++) newState.scores[i] = { total: 0, round: 0 };
+
+      db.ref('config').set({ players, rounds });
+      db.ref('state').set(newState);
+      document.getElementById('status').innerHTML = `<strong style="color:#9b59b6">Configuration OK.</strong>`;
+      document.getElementById('roundControlBtn').disabled = false;
+      forceUpdate();
+    }
+
+    function startRound() {
+      db.ref('state').update({ roundStarted: true, votes: {} });
+      document.getElementById('roundControlBtn').innerText = "Passer au round suivant";
+      document.getElementById('status').innerHTML = `<strong style="color:#2ecc71">Ronde 1 lancée !</strong>`;
+    }
+
+    function endCurrentRound() {
+      db.ref('state').once('value').then(snap => {
+        const state = snap.val();
+        const config = state.config || {};
+        for (let i = 1; i <= config.players; i++) {
+          const m = state.votes?.[i];
+          if (!m) continue;
+          const a = state.paires[i];
+          const ac = state.votes?.[a] || '—';
+          const p = payoffs[m + ac] || 0;
+          db.ref(`state/scores/${i}`).update({ round: p });
+          db.ref(`state/scores/${i}/total`).transaction(t => (t || 0) + p);
+        }
+        db.ref('state/roundStarted').set(false);
+      });
+    }
+
+    function nextRoundLogic() {
+      db.ref('state').once('value').then(snap => {
+        const state = snap.val();
+        if (!state.roundStarted && state.round === 1) {
+          startRound();
+          return;
+        }
+        endCurrentRound();
+        if (state.round >= state.config?.rounds) {
+          document.getElementById('roundControlBtn').innerText = "Fin";
+          document.getElementById('roundControlBtn').disabled = true;
+          alert("Jeu terminé !");
+          return;
+        }
+        db.ref('state').update({
+          round: state.round + 1,
+          votes: {},
+          roundStarted: true
+        });
+        document.getElementById('status').innerHTML = `<strong style="color:#2ecc71">Ronde ${state.round + 1} lancée !</strong>`;
+      });
+    }
+
+    function resetAll() {
+      if (!confirm("Tout sera effacé.")) return;
+      db.ref().set({ config: {}, state: { round: 1, scores: {}, paires: {}, names: {}, usedIds: [], votes: {}, roundStarted: false } });
+      document.getElementById('status').innerHTML = `<strong style="color:#e74c3c">Réinitialisé !</strong>`;
+      document.getElementById('roundControlBtn').innerText = "Lancer Ronde";
+      document.getElementById('roundControlBtn').disabled = true;
+      if (scoresChart) scoresChart.destroy();
+    }
+
+    function forceUpdate() {
+      db.ref('config').on('value', configSnap => {
+        db.ref('state').on('value', stateSnap => {
+          const config = configSnap.val() || {};
+          const state = stateSnap.val() || {};
+          if (!config.players) return;
+
+          document.getElementById('currentRound').innerText = state.round || 1;
+          document.getElementById('totalRounds').innerText = config.rounds || 0;
+
+          const tbody = document.getElementById('resultsTable');
+          tbody.innerHTML = '';
+          let votesCount = 0;
+          for (let i = 1; i <= config.players; i++) {
+            if (state.votes?.[i]) votesCount++;
+            const s = state.scores?.[i] || { round: 0, total: 0 };
+            const name = state.names?.[i] || `Joueur ${i}`;
+            tbody.innerHTML += `<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
+          }
+
+          const btn = document.getElementById('roundControlBtn');
+          if (state.round >= config.rounds) {
+            btn.innerText = "Fin"; btn.disabled = true;
+          } else if (!state.roundStarted) {
+            btn.innerText = "Lancer Ronde"; btn.disabled = false;
+          } else {
+            btn.innerText = "Passer au round suivant";
+            btn.disabled = votesCount < config.players;
+          }
+
+          document.getElementById('votesStatus').innerText = state.roundStarted
+            ? `${votesCount}/${config.players} votes`
+            : "En attente du lancement";
+
+          updateChart(state, config.players);
+        });
+      });
+    }
+
+    function updateChart(state, numPlayers) {
+      const ctx = document.getElementById('scoresChart').getContext('2d');
+      const labels = [], data = [];
+      for (let i = 1; i <= numPlayers; i++) {
+        labels.push(state.names?.[i] || `Joueur ${i}`);
+        data.push(state.scores?.[i]?.total || 0);
+      }
+      if (scoresChart) scoresChart.destroy();
+      scoresChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: '#4a90e2', borderRadius: 6 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Scores Totaux', color: '#e0e0e0' } }, scales: { x: { beginAtZero: true, ticks: { color: '#e0e0e0' } }, y: { ticks: { color: '#e0e0e0' } } } }
+      });
+    }
+
+    window.onload = () => {
+      db.ref('config').once('value').then(snap => {
+        if (snap.val()) forceUpdate();
+      });
+    };
+  </script>
+</body>
+</html>
