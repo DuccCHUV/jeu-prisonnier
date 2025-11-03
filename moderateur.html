@@ -94,49 +94,45 @@
       for (let i = 1; i <= players; i++) newState.scores[i] = { total: 0, round: 0 };
 
       db.ref('config').set({ players, rounds });
-      db.ref('state').set(newState);
-      document.getElementById('status').innerHTML = `<strong style="color:#9b59b6">Configuration OK.</strong>`;
-      document.getElementById('roundControlBtn').disabled = false;
-      forceUpdate();
+      db.ref('state').set(newState).then(() => {
+        document.getElementById('status').innerHTML = `<strong style="color:#9b59b6">Configuration OK.</strong>`;
+        document.getElementById('roundControlBtn').disabled = false;
+        forceUpdate();
+      });
     }
 
-    function startRound() {
-      db.ref('state').update({ roundStarted: true, votes: {} });
-      document.getElementById('roundControlBtn').innerText = "Passer au round suivant";
-      document.getElementById('status').innerHTML = `<strong style="color:#2ecc71">Round 1 lancé !</strong>`;
-    }
+    document.getElementById('roundControlBtn').addEventListener('click', nextRoundLogic);
 
-    function endCurrentRound() {
+    function nextRoundLogic() {
       db.ref('state').once('value').then(snap => {
         const state = snap.val();
-        const config = state.config || {};
-        for (let i = 1; i <= config.players; i++) {
+        if (!state) return;
+
+        if (!state.roundStarted && state.round === 1) {
+          db.ref('state').update({ roundStarted: true, votes: {} });
+          document.getElementById('roundControlBtn').innerText = "Passer au round suivant";
+          document.getElementById('status').innerHTML = `<strong style="color:#2ecc71">Round 1 lancé !</strong>`;
+          return;
+        }
+
+        // Calcule les points
+        for (let i = 1; i <= state.config?.players; i++) {
           const m = state.votes?.[i];
           if (!m) continue;
           const a = state.paires[i];
           const ac = state.votes?.[a] || '—';
           const p = payoffs[m + ac] || 0;
-          db.ref(`state/scores/${i}`).update({ round: p });
+          db.ref(`state/scores/${i}/round`).set(p);
           db.ref(`state/scores/${i}/total`).transaction(t => (t || 0) + p);
         }
-        db.ref('state/roundStarted').set(false);
-      });
-    }
 
-    function nextRoundLogic() {
-      db.ref('state').once('value').then(snap => {
-        const state = snap.val();
-        if (!state.roundStarted && state.round === 1) {
-          startRound();
-          return;
-        }
-        endCurrentRound();
         if (state.round >= state.config?.rounds) {
           document.getElementById('roundControlBtn').innerText = "Fin";
           document.getElementById('roundControlBtn').disabled = true;
           alert("Jeu terminé !");
           return;
         }
+
         db.ref('state').update({
           round: state.round + 1,
           votes: {},
@@ -210,18 +206,20 @@
         data: {
           labels,
           datasets: [{
-            data, 
+            data,
             backgroundColor: colors.slice(0, numPlayers),
             borderWidth: 1,
           }]
         },
         options: {
-          indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
           animation: { duration: 800 },
           plugins: { legend: { display: false }, title: { display: true, text: 'Scores Totaux', color: '#e0e0e0' } },
-          scales: { x: { beginAtZero: true, ticks: { color: '#e0e0e0' } }, y: { ticks: { color: '#e0e0e0' } } }
+          scales: {
+            y: { beginAtZero: true, ticks: { color: '#e0e0e0' } },
+            x: { ticks: { color: '#e0e0e0' } }
+          }
         }
       };
 
