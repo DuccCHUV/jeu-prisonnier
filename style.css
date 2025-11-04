@@ -1,0 +1,188 @@
+:root {
+  --bg: #0f0f1a;
+  --card: rgba(26,26,46,0.92);
+  --accent: #4a90e2;
+  --text: #e0e0e0;
+  --green: #2ecc71;
+  --red: #e74c3c;
+  --orange: #f39c12;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* === COMMUN === */
+body {
+  background: url('image.jpg') center center / cover no-repeat fixed;
+  color: var(--text);
+  font-family: 'Segoe UI', sans-serif;
+  position: relative;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15,15,26,0.4);
+  z-index: -1;
+}
+
+.card {
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  border: 1px solid rgba(74,144,226,0.2);
+  z-index: 1;
+}
+
+/* === MODÉRATEUR === */
+.moderateur-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.moderateur-card {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+h1 { text-align: center; margin-bottom: 1rem; }
+
+select, button {
+  width: 100%;
+  padding: 0.9rem;
+  border-radius: 8px;
+  border: none;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+select { background: #333; color: white; }
+
+button {
+  background: var(--accent);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background: #357abd;
+  transform: scale(1.02);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #555 !important;
+}
+
+button.roundBtn {
+  background: var(--green);
+  font-size: 1.2rem;
+  padding: 1.2rem;
+  margin-top: 1.5rem;
+}
+
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 1rem;
+}
+
+.score-table th, .score-table td {
+  padding: 0.8rem;
+  text-align: center;
+  border-bottom: 1px solid #444;
+}
+
+.score-table th { background: #222; }
+
+.live { color: var(--green); font-weight: bold; }
+.waiting { color: var(--orange); font-weight: bold; text-align: center; margin-top: 0.5rem; }
+
+.btn-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.btn-group button { flex: 1; }
+.btn-group button.reset { background: var(--red); }
+.btn-group button.reset:hover { background: #c0392b; }
+
+#scoresChart { position: relative; height: 400px; margin: 2rem auto; max-width: 100%; }
+.chart-container {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 1rem;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(74,144,226,0.2);
+}
+
+/* === JOUEUR === */
+.joueur-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.joueur-card {
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.joueur-card input {
+  background: #333;
+  color: white;
+}
+
+.choice-btn {
+  font-size: 1.5rem;
+  padding: 1.2rem;
+  margin: 1rem 0.5rem;
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.choice-btn.coop { background: var(--green); }
+.choice-btn.trahir { background: var(--red); }
+.choice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #555 !important;
+}
+
+.progress {
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0;
+  transition: width 0.5s;
+}
+
+.locked { color: #f39c12; font-weight: bold; }
+.hidden { display: none; }
