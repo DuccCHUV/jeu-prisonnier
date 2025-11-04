@@ -1,320 +1,300 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Modérateur - Prisonnier</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<style>
-:root { 
-  --bg: #0f0f1a; 
-  --card: rgba(26,26,46,0.92); 
-  --accent: #4a90e2; 
-  --text: #e0e0e0; 
-  --green: #2ecc71; 
-  --red: #e74c3c; 
-  --orange: #f39c12; 
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { 
-  background: url('image.jpg') center center / cover no-repeat fixed;
-  color: var(--text); font-family: 'Segoe UI', sans-serif; padding: 2rem;
-  display: flex; flex-direction: column; gap: 2rem; min-height: 100vh; position: relative;
-}
-body::before {
-  content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
-  background: rgba(15,15,26,0.4); z-index: -1;
-}
-.card { 
-  background: var(--card); 
-  backdrop-filter: blur(12px);
-  border-radius: 16px; padding: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  max-width: 900px; margin: 0 auto; border:1px solid rgba(74,144,226,0.2); z-index:1;
-}
-h1 { text-align:center; margin-bottom:1rem; }
-select, button { width:100%; padding:0.9rem; border-radius:8px; border:none; margin-bottom:1rem; font-size:1rem;}
-select { background:#333; color:white; }
-button { background: var(--accent); color:white; font-weight:bold; cursor:pointer; transition:0.2s;}
-button:hover:not(:disabled){ background:#357abd; transform:scale(1.02);}
-button:disabled{ opacity:0.5; cursor:not-allowed; background:#555 !important; }
-button.roundBtn{ background: var(--green); font-size:1.2rem; padding:1.2rem; margin-top:1.5rem; }
-.score-table { width:100%; border-collapse:collapse; margin-top:1rem; font-size:1rem;}
-.score-table th, .score-table td{ padding:0.8rem; text-align:center; border-bottom:1px solid #444;}
-.score-table th { background:#222; }
-.live { color: var(--green); font-weight:bold; }
-.waiting { color: var(--orange); font-weight:bold; text-align:center; margin-top:0.5rem; }
-.btn-group { display:flex; gap:1rem; margin-top:1rem; }
-.btn-group button{ flex:1; }
-.btn-group button.reset { background: var(--red); }
-.btn-group button.reset:hover{ background:#c0392b; }
-#scoresChart{ position:relative; height:400px; margin:2rem auto; max-width:100%; }
-.chart-container{ background: var(--card); border-radius:12px; padding:1rem; backdrop-filter:blur(10px); border:1px solid rgba(74,144,226,0.2);}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Modérateur - Prisonnier</title>
+
+  <!-- CSS EXTERNE -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Librairies -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
-<body>
+<body class="moderateur-body">
 
-<div class="card">
-<h1>Scores en Direct <span class="live">Live</span></h1>
-<p style="text-align:center;">Round <span id="currentRound">—</span> / <span id="totalRounds">—</span></p>
-<p id="votesStatus" class="waiting">En attente du lancement...</p>
-<table class="score-table">
-<thead><tr><th>Nom</th><th>Points Round</th><th>Total</th></tr></thead>
-<tbody id="resultsTable"></tbody>
-</table>
-<div class="chart-container">
-<canvas id="scoresChart"></canvas>
-</div>
-<button id="roundControlBtn" class="roundBtn" disabled>Lancer Round</button>
+<div class="card moderateur-card">
+  <h1>Scores en Direct <span class="live">Live</span></h1>
+  <p style="text-align:center;">Round <span id="currentRound">—</span> / <span id="totalRounds">—</span></p>
+  <p id="votesStatus" class="waiting">En attente du lancement...</p>
+  <table class="score-table">
+    <thead><tr><th>Nom</th><th>Points Round</th><th>Total</th></tr></thead>
+    <tbody id="resultsTable"></tbody>
+  </table>
+  <div class="chart-container">
+    <canvas id="scoresChart"></canvas>
+  </div>
+  <button id="roundControlBtn" class="roundBtn" disabled>Lancer Round</button>
 </div>
 
-<div class="card">
-<h1>Configuration du Jeu</h1>
-<label>Joueurs (pair)</label>
-<select id="numPlayers">
-<option value="2">2</option>
-<option value="4">4</option>
-<option value="6">6</option>
-<option value="8">8</option>
-<option value="10">10</option>
-</select>
-<label>Rounds</label>
-<select id="numRounds">
-<script>for(let i=10;i<=50;i+=5)document.write(`<option value="${i}">${i}</option>`);</script>
-</select>
-<div class="btn-group">
-<button onclick="saveConfig()">Configurer</button>
-<button class="reset" onclick="resetAll()">Réinitialiser</button>
-</div>
-<p id="status" style="text-align:center; margin-top:1rem;">En attente de configuration...</p>
+<div class="card moderateur-card">
+  <h1>Configuration du Jeu</h1>
+  <label>Joueurs (pair)</label>
+  <select id="numPlayers">
+    <option value="2">2</option>
+    <option value="4">4</option>
+    <option value="6">6</option>
+    <option value="8">8</option>
+    <option value="10">10</option>
+  </select>
+  <label>Rounds</label>
+  <select id="numRounds">
+    <script>
+      for(let i=10; i<=50; i+=5) {
+        document.write(`<option value="${i}">${i}</option>`);
+      }
+    </script>
+  </select>
+  <div class="btn-group">
+    <button onclick="saveConfig()">Configurer</button>
+    <button class="reset" onclick="resetAll()">Réinitialiser</button>
+  </div>
+  <p id="status" style="text-align:center; margin-top:1rem;">En attente de configuration...</p>
 </div>
 
 <script>
-const payoffs = { 'CC':3,'CD':0,'DC':5,'DD':1 };
-let scoresChart = null;
+  const payoffs = { 'CC':3, 'CD':0, 'DC':5, 'DD':1 };
+  let scoresChart = null;
 
-// --- Firebase ---
-const firebaseConfig = {
-  apiKey: "AIzaSyBREaX2qwor0mO6Q4xAVOVERuQmYYeKWfw",
-  authDomain: "jeu-prisonnier.firebaseapp.com",
-  databaseURL: "https://jeu-prisonnier-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "jeu-prisonnier",
-  storageBucket: "jeu-prisonnier.firebasestorage.app",
-  messagingSenderId: "165842620681",
-  appId: "1:165842620681:web:0f57a9d473810031ba83d8"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// ================== Config ==================
-async function saveConfig(){
-  const players = parseInt(document.getElementById('numPlayers').value);
-  const rounds = parseInt(document.getElementById('numRounds').value);
-  if(players%2!==0) return alert("Nombre de joueurs doit être pair !");
-  const ids = Array.from({length:players},(_,i)=>i+1);
-  for(let i=ids.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
-  const paires={}; for(let i=0;i<ids.length;i+=2){ paires[ids[i]]=ids[i+1]; paires[ids[i+1]]=ids[i]; }
-  
-  const newState = { 
-    round: 1, 
-    currentRound: 1,
-    roundStarted: false, 
-    roundActive: false,
-    scores: {}, 
-    paires, 
-    names: {}, 
-    votes: {} 
+  // --- Firebase ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyBREaX2qwor0mO6Q4xAVOVERuQmYYeKWfw",
+    authDomain: "jeu-prisonnier.firebaseapp.com",
+    databaseURL: "https://jeu-prisonnier-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "jeu-prisonnier",
+    storageBucket: "jeu-prisonnier.firebasestorage.app",
+    messagingSenderId: "165842620681",
+    appId: "1:165842620681:web:0f57a9d473810031ba83d8"
   };
-  for(let i=1;i<=players;i++) newState.scores[i]={ total:0, round:0 };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-  await db.ref().set({ config:{players,rounds}, game:newState });
-  document.getElementById('roundControlBtn').disabled=false;
-  document.getElementById('status').innerHTML=`<strong style="color:#9b59b6">Configuration OK.</strong>`;
-}
+  // ================== Config ==================
+  async function saveConfig(){
+    const players = parseInt(document.getElementById('numPlayers').value);
+    const rounds = parseInt(document.getElementById('numRounds').value);
+    if(players % 2 !== 0) return alert("Nombre de joueurs doit être pair !");
+    const ids = Array.from({length:players},(_,i)=>i+1);
+    for(let i=ids.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    const paires = {};
+    for(let i=0; i<ids.length; i+=2){
+      paires[ids[i]] = ids[i+1];
+      paires[ids[i+1]] = ids[i];
+    }
+    
+    const newState = { 
+      round: 1, 
+      currentRound: 1,
+      roundStarted: false, 
+      roundActive: false,
+      scores: {}, 
+      paires, 
+      names: {}, 
+      votes: {} 
+    };
+    for(let i=1; i<=players; i++) newState.scores[i] = { total:0, round:0 };
 
-// ================== Lancer le round (manuel) ==================
-async function startRound(){
-  const snap = await db.ref('game').once('value');
-  const game = snap.val();
-  if(!game || game.roundStarted) return;
-
-  await db.ref('game').update({ 
-    roundStarted: true, 
-    roundActive: true,
-    currentRound: game.round,
-    votes: {} 
-  });
-  document.getElementById('roundControlBtn').innerText="En attente des votes...";
-  document.getElementById('roundControlBtn').disabled = true;
-  document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${game.round} lancé !</strong>`;
-}
-
-// ================== Passer au round suivant (manuel) ==================
-async function nextRound(){
-  const snap = await db.ref('game').once('value');
-  const game = snap.val();
-  if(!game || game.roundStarted) return;
-
-  const nextRoundNum = game.round + 1;
-  const configSnap = await db.ref('config/rounds').once('value');
-  const totalRounds = configSnap.val();
-
-  if (game.round >= totalRounds) {
-    document.getElementById('roundControlBtn').innerText="Fin du jeu"; 
-    document.getElementById('roundControlBtn').disabled=true;
-    document.getElementById('roundControlBtn').style.background = "#555";
-    alert("Jeu terminé !");
-    return;
+    await db.ref().set({ config:{players,rounds}, game:newState });
+    document.getElementById('roundControlBtn').disabled = false;
+    document.getElementById('status').innerHTML = `<strong style="color:#9b59b6">Configuration OK.</strong>`;
   }
 
-  await db.ref('game').update({ 
-    round: nextRoundNum,
-    currentRound: nextRoundNum,
-    roundStarted: true,
-    roundActive: true,
-    votes: {}
-  });
-  document.getElementById('roundControlBtn').innerText="En attente des votes...";
-  document.getElementById('roundControlBtn').disabled = true;
-  document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${nextRoundNum} lancé !</strong>`;
-}
+  // ================== Lancer le round (manuel) ==================
+  async function startRound(){
+    const snap = await db.ref('game').once('value');
+    const game = snap.val();
+    if(!game || game.roundStarted) return;
 
-// ================== Calcul auto des points + FIN AUTOMATIQUE ==================
-async function autoCalculatePoints(){
-  const gameSnap = await db.ref('game').once('value');
-  const game = gameSnap.val();
-  const configSnap = await db.ref('config').once('value');
-  const config = configSnap.val();
-
-  const isLastRound = game.round === config.rounds;
-
-  const updates = {};
-  for(let i in game.votes){
-    const a = game.paires[i];
-    const m = game.votes[i]; if(!m) continue;
-    const ac = game.votes[a] || '—';
-    const p = payoffs[m+ac]||0;
-    updates[`scores/${i}/round`] = p;
-    updates[`scores/${i}/total`] = (game.scores[i]?.total||0) + p;
+    await db.ref('game').update({ 
+      roundStarted: true, 
+      roundActive: true,
+      currentRound: game.round,
+      votes: {} 
+    });
+    document.getElementById('roundControlBtn').innerText = "En attente des votes...";
+    document.getElementById('roundControlBtn').disabled = true;
+    document.getElementById('status').innerHTML = `<strong style="color:#2ecc71">Round ${game.round} lancé !</strong>`;
   }
-  await db.ref('game').update(updates);
-  await db.ref('game').update({ roundStarted: false, roundActive: false });
 
-  if (isLastRound) {
+  // ================== Passer au round suivant (manuel) ==================
+  async function nextRound(){
+    const snap = await db.ref('game').once('value');
+    const game = snap.val();
+    if(!game || game.roundStarted) return;
+
+    const nextRoundNum = game.round + 1;
+    const configSnap = await db.ref('config/rounds').once('value');
+    const totalRounds = configSnap.val();
+
+    if (game.round >= totalRounds) {
+      const btn = document.getElementById('roundControlBtn');
+      btn.innerText = "Fin du jeu";
+      btn.disabled = true;
+      btn.style.background = "#555";
+      btn.style.cursor = "not-allowed";
+      alert("Jeu terminé !");
+      return;
+    }
+
+    await db.ref('game').update({ 
+      round: nextRoundNum,
+      currentRound: nextRoundNum,
+      roundStarted: true,
+      roundActive: true,
+      votes: {}
+    });
+    document.getElementById('roundControlBtn').innerText = "En attente des votes...";
+    document.getElementById('roundControlBtn').disabled = true;
+    document.getElementById('status').innerHTML = `<strong style="color:#2ecc71">Round ${nextRoundNum} lancé !</strong>`;
+  }
+
+  // ================== Calcul auto des points + FIN AUTOMATIQUE ==================
+  async function autoCalculatePoints(){
+    const gameSnap = await db.ref('game').once('value');
+    const game = gameSnap.val();
+    const configSnap = await db.ref('config').once('value');
+    const config = configSnap.val();
+
+    const isLastRound = game.round === config.rounds;
+
+    const updates = {};
+    for(let i in game.votes){
+      const a = game.paires[i];
+      const m = game.votes[i]; if(!m) continue;
+      const ac = game.votes[a] || '—';
+      const p = payoffs[m+ac] || 0;
+      updates[`scores/${i}/round`] = p;
+      updates[`scores/${i}/total`] = (game.scores[i]?.total || 0) + p;
+    }
+    await db.ref('game').update(updates);
+    await db.ref('game').update({ roundStarted: false, roundActive: false });
+
+    if (isLastRound) {
+      const btn = document.getElementById('roundControlBtn');
+      btn.innerText = "Fin du jeu";
+      btn.disabled = true;
+      btn.style.background = "#555";
+      btn.style.cursor = "not-allowed";
+      alert("Jeu terminé !");
+      return;
+    }
+
+    document.getElementById('roundControlBtn').innerText = "Lancer le round suivant";
+    document.getElementById('roundControlBtn').disabled = false;
+    document.getElementById('roundControlBtn').onclick = nextRound;
+  }
+
+  // ================== Reset ==================
+  function resetAll(){
+    if(!confirm("Tout sera effacé.")) return;
+    db.ref().set({ 
+      config: {}, 
+      game: { 
+        round:1, currentRound:1, scores:{}, paires:{}, names:{}, votes:{}, 
+        roundStarted:false, roundActive:false 
+      } 
+    });
+    document.getElementById('status').innerHTML = `<strong style="color:#e74c3c">Réinitialisé !</strong>`;
+    document.getElementById('roundControlBtn').innerText = "Lancer Round";
+    document.getElementById('roundControlBtn').disabled = true;
+    document.getElementById('roundControlBtn').onclick = null;
+    document.getElementById('roundControlBtn').style.background = "";
+    if(scoresChart) scoresChart.destroy();
+  }
+
+  // ================== Écoute Firebase + Auto-calcul + Fin auto ==================
+  db.ref().on('value', snap => {
+    const data = snap.val() || {};
+    const config = data.config || {};
+    const game = data.game || {};
+
+    // Tableau
+    const tbody = document.getElementById('resultsTable'); tbody.innerHTML = '';
+    let votesCount = 0;
+    for(let i=1; i<=config.players; i++){
+      const s = game.scores?.[i] || { round:0, total:0 };
+      const name = game.names?.[i] || `Joueur ${i}`;
+      if(game.votes?.[i]) votesCount++;
+      tbody.innerHTML += `<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
+    }
+
     const btn = document.getElementById('roundControlBtn');
-    btn.innerText = "Fin du jeu";
-    btn.disabled = true;
-    btn.style.background = "#555";
-    btn.style.cursor = "not-allowed";
-    alert("Jeu terminé !");
-    return;
-  }
 
-  document.getElementById('roundControlBtn').innerText = "Lancer le round suivant";
-  document.getElementById('roundControlBtn').disabled = false;
-  document.getElementById('roundControlBtn').onclick = nextRound;
-}
-
-// ================== Reset ==================
-function resetAll(){
-  if(!confirm("Tout sera effacé.")) return;
-  db.ref().set({ config:{}, game:{ round:1, currentRound:1, scores:{}, paires:{}, names:{}, votes:{}, roundStarted:false, roundActive:false } });
-  document.getElementById('status').innerHTML=`<strong style="color:#e74c3c">Réinitialisé !</strong>`;
-  document.getElementById('roundControlBtn').innerText="Lancer Round";
-  document.getElementById('roundControlBtn').disabled=true;
-  document.getElementById('roundControlBtn').onclick = null;
-  document.getElementById('roundControlBtn').style.background = "";
-  if(scoresChart) scoresChart.destroy();
-}
-
-// ================== Écoute Firebase + Auto-calcul + Fin auto ==================
-db.ref().on('value', snap => {
-  const data = snap.val() || {};
-  const config = data.config || {};
-  const game = data.game || {};
-
-  const tbody = document.getElementById('resultsTable'); tbody.innerHTML='';
-  let votesCount = 0;
-  for(let i=1; i<=config.players; i++){
-    const s = game.scores?.[i] || { round:0, total:0 };
-    const name = game.names?.[i] || `Joueur ${i}`;
-    if(game.votes?.[i]) votesCount++;
-    tbody.innerHTML += `<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
-  }
-
-  const btn = document.getElementById('roundControlBtn');
-
-  // --- Gestion du bouton ---
-  if (game.round > config.rounds) {
-    btn.innerText = "Fin du jeu"; 
-    btn.disabled = true;
-    btn.onclick = null;
-    btn.style.background = "#555";
-    btn.style.cursor = "not-allowed";
-  } 
-  else if (!game.roundStarted && !game.roundActive) {
-    btn.innerText = "Lancer Round";
-    btn.disabled = false;
-    btn.onclick = startRound;
-  } 
-  else if (game.roundStarted) {
-    btn.innerText = `En attente... (${votesCount}/${config.players})`;
-    btn.disabled = true;
-    btn.onclick = null;
-  } 
-  else {
-    btn.innerText = "Lancer le round suivant";
-    btn.disabled = false;
-    btn.onclick = nextRound;
-  }
-
-  // --- Status ---
-  if (game.roundStarted) {
-    if (votesCount === config.players) {
-      document.getElementById('votesStatus').innerHTML = `<span style="color:#2ecc71; font-weight:bold;">Tous ont voté ! Calcul en cours...</span>`;
-    } else {
-      document.getElementById('votesStatus').innerText = `${votesCount}/${config.players} votes`;
-    }
-  } else {
-    document.getElementById('votesStatus').innerText = "En attente du lancement";
-  }
-
-  // --- AUTO CALCUL SI TOUS ONT VOTÉ ---
-  if (game.roundStarted && votesCount === config.players && config.players > 0) {
-    if (!window.calculating) {
-      window.calculating = true;
-      setTimeout(() => {
-        autoCalculatePoints().finally(() => window.calculating = false);
-      }, 1500);
-    }
-  }
-
-  // --- Graphique ---
-  const ctx = document.getElementById('scoresChart').getContext('2d');
-  const labels = []; const points = [];
-  const colors = ['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
-  for(let i=1; i<=config.players; i++){ 
-    labels.push(game.names?.[i] || `Joueur ${i}`); 
-    points.push(game.scores?.[i]?.total || 0); 
-  }
-
-  const chartConfig = { 
-    type:'bar', 
-    data:{ labels, datasets:[{ data:points, backgroundColor:colors.slice(0,config.players), borderWidth:1 }] }, 
-    options:{ 
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false }, title:{ display:true, text:'Scores Totaux', color:'#e0e0e0' } },
-      scales:{ y:{ beginAtZero:true, ticks:{ color:'#e0e0e0' } }, x:{ ticks:{ color:'#e0e0e0' } } } 
+    // Gestion du bouton
+    if (game.round > config.rounds) {
+      btn.innerText = "Fin du jeu"; 
+      btn.disabled = true;
+      btn.onclick = null;
+      btn.style.background = "#555";
+      btn.style.cursor = "not-allowed";
     } 
-  };
+    else if (!game.roundStarted && !game.roundActive) {
+      btn.innerText = "Lancer Round";
+      btn.disabled = false;
+      btn.onclick = startRound;
+    } 
+    else if (game.roundStarted) {
+      btn.innerText = `En attente... (${votesCount}/${config.players})`;
+      btn.disabled = true;
+      btn.onclick = null;
+    } 
+    else {
+      btn.innerText = "Lancer le round suivant";
+      btn.disabled = false;
+      btn.onclick = nextRound;
+    }
 
-  if(scoresChart) scoresChart.destroy();
-  scoresChart = new Chart(ctx, chartConfig);
+    // Status
+    if (game.roundStarted) {
+      if (votesCount === config.players) {
+        document.getElementById('votesStatus').innerHTML = `<span style="color:#2ecc71; font-weight:bold;">Tous ont voté ! Calcul en cours...</span>`;
+      } else {
+        document.getElementById('votesStatus').innerText = `${votesCount}/${config.players} votes`;
+      }
+    } else {
+      document.getElementById('votesStatus').innerText = "En attente du lancement";
+    }
 
-  document.getElementById('currentRound').innerText = game.currentRound || game.round || 1;
-  document.getElementById('totalRounds').innerText = config.rounds || 0;
-});
+    // AUTO CALCUL
+    if (game.roundStarted && votesCount === config.players && config.players > 0) {
+      if (!window.calculating) {
+        window.calculating = true;
+        setTimeout(() => {
+          autoCalculatePoints().finally(() => window.calculating = false);
+        }, 1500);
+      }
+    }
+
+    // Graphique
+    const ctx = document.getElementById('scoresChart').getContext('2d');
+    const labels = []; const points = [];
+    const colors = ['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
+    for(let i=1; i<=config.players; i++){ 
+      labels.push(game.names?.[i] || `Joueur ${i}`); 
+      points.push(game.scores?.[i]?.total || 0); 
+    }
+
+    const chartConfig = { 
+      type:'bar', 
+      data:{ labels, datasets:[{ data:points, backgroundColor:colors.slice(0,config.players), borderWidth:1 }] }, 
+      options:{ 
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false }, title:{ display:true, text:'Scores Totaux', color:'#e0e0e0' } },
+        scales:{ y:{ beginAtZero:true, ticks:{ color:'#e0e0e0' } }, x:{ ticks:{ color:'#e0e0e0' } } } 
+      } 
+    };
+
+    if(scoresChart) scoresChart.destroy();
+    scoresChart = new Chart(ctx, chartConfig);
+
+    document.getElementById('currentRound').innerText = game.currentRound || game.round || 1;
+    document.getElementById('totalRounds').innerText = config.rounds || 0;
+  });
 </script>
 </body>
 </html>
