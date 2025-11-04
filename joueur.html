@@ -129,6 +129,10 @@
       if (!playerName || !playerId || playerId < 1 || playerId > 20)
         return alert("Nom + ID (1-20) requis !");
       localStorage.setItem('playerData', JSON.stringify({ name: playerName, id: playerId }));
+      
+      // Enregistrer le nom dans Firebase
+      db.ref(`game/names/${playerId}`).set(playerName);
+      
       showGame();
     }
 
@@ -156,15 +160,16 @@
     function loadGameState() {
       const configRef = db.ref('config');
       const gameRef = db.ref('game');
+      let configSnap = null;
 
-      configRef.on('value', configSnap => {
-        const config = configSnap.val() || {};
-        document.getElementById('totalRounds').innerText = config.rounds || '?';
+      configRef.on('value', snap => {
+        configSnap = snap;
+        document.getElementById('totalRounds').innerText = snap.val()?.rounds || '?';
       });
 
       gameRef.on('value', gameSnap => {
         const game = gameSnap.val() || {};
-        const round = game.currentRound || 1;
+        const round = game.currentRound || game.round || 1;
         const active = game.roundActive === true;
         const votes = game.votes || {};
         const pairs = game.paires || {};
@@ -183,6 +188,7 @@
           ? "En attente du modérateur..."
           : hasVoted ? "Vote enregistré !" : "Votre tour !";
 
+        // Feedback après vote de l'adversaire
         if (hasVoted && pairs[playerId] && votes[pairs[playerId]]) {
           const myVote = votes[playerId];
           const oppVote = votes[pairs[playerId]];
@@ -209,6 +215,7 @@
 
     // --- Barre de progression ---
     function updateProgress(current, total) {
+      if (!total) return;
       const p = ((current - 1) / total) * 100;
       document.getElementById('progressBar').style.width = p + '%';
     }
