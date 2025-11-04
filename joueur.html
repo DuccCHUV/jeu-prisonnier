@@ -4,82 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Joueur - Dilemme du prisonnier</title>
+
+  <!-- CSS EXTERNE -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <style>
-    :root {
-      --bg: #0f0f1a;
-      --card: rgba(26,26,46,0.92);
-      --accent: #4a90e2;
-      --text: #e0e0e0;
-      --green: #2ecc71;
-      --red: #e74c3c;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: url('image.jpg') center center / cover no-repeat fixed;
-      color: var(--text);
-      font-family: 'Segoe UI', sans-serif;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      min-height: 100vh; padding: 2rem; position: relative;
-    }
-    body::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15,15,26,0.5); z-index: -1;
-    }
-    .card {
-      background: var(--card);
-      backdrop-filter: blur(12px);
-      border-radius: 16px;
-      padding: 2rem;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      max-width: 500px;
-      width: 100%;
-      text-align: center;
-      border: 1px solid rgba(74,144,226,0.2);
-      z-index: 1;
-    }
-    h1 { margin-bottom: 1rem; }
-    input, button {
-      width: 100%;
-      padding: 0.9rem;
-      border-radius: 8px;
-      border: none;
-      margin: 0.8rem 0;
-      font-size: 1rem;
-    }
-    input { background: #333; color: white; }
-    .choice-btn {
-      font-size: 1.5rem;
-      padding: 1.2rem;
-      margin: 1rem 0.5rem;
-      flex: 1;
-      min-width: 140px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    .choice-btn.coop { background: var(--green); }
-    .choice-btn.trahir { background: var(--red); }
-    .choice-btn:disabled {
-      opacity: 0.5; cursor: not-allowed; background: #555 !important;
-    }
-    .progress {
-      height: 8px; background: #333;
-      border-radius: 4px; overflow: hidden; margin: 1rem 0;
-    }
-    .progress-bar {
-      height: 100%; background: var(--accent);
-      width: 0; transition: width 0.5s;
-    }
-    .locked { color: #f39c12; font-weight: bold; }
-    .hidden { display: none; }
-  </style>
 </head>
-<body>
+<body class="joueur-body">
 
-  <div class="card">
+  <div class="card joueur-card">
     <!-- Page d'inscription -->
     <div id="setupPage">
       <h1>Choisissez NOM + ID</h1>
@@ -98,7 +33,6 @@
         <button id="btnCoop" class="choice-btn coop" onclick="vote('C')" disabled>Coopérer</button>
         <button id="btnTrahir" class="choice-btn trahir" onclick="vote('D')" disabled>Trahir</button>
       </div>
-      <!-- FEEDBACK SUPPRIMÉ -->
     </div>
   </div>
 
