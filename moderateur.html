@@ -1,97 +1,85 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Modérateur - Prisonnier (sync game)</title>
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Modérateur - Prisonnier</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <style>
-:root{
-  --accent:#4a90e2; --green:#2ecc71; --red:#e74c3c; --orange:#f39c12;
-  --text:#1a1a2e; --bg:#f4f6fb;
+:root { 
+  --bg: #0f0f1a; --card: rgba(255,255,255,0.95); --accent: #4a90e2; --text: #0f0f1a; 
+  --green: #2ecc71; --red: #e74c3c; --orange: #f39c12; 
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  background: var(--bg) url('image.jpg') center/cover no-repeat fixed;
-  font-family: "Segoe UI",sans-serif;
-  padding:2rem;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:1.5rem;
-  min-height:100vh;
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  background: url('image.jpg') center center / cover no-repeat fixed;
+  color: var(--text); font-family: 'Segoe UI', sans-serif; padding: 2rem;
+  display: flex; flex-direction: column; gap: 2rem; min-height: 100vh; position: relative;
 }
-/* Overlay softened to avoid dark blocks */
-body::before{
-  content:"";position:absolute;inset:0;
-  background: rgba(0,0,0,0.06); z-index:-1;
+body::before {
+  content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+  background: rgba(15,15,26,0.4); z-index: -1;
 }
-
-/* Card */
-.card{
-  width:90%; max-width:900px;
-  background: rgba(255,255,255,0.96); /* increased opacity for readability */
-  border-radius:14px; padding:1.6rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-  border:1px solid rgba(74,144,226,0.12);
-  color:var(--text);
+.card { 
+  background: var(--card); border-radius:16px; padding:2rem; box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  max-width:900px; margin:0 auto; border:1px solid rgba(74,144,226,0.2); z-index:1;
 }
-
-/* header small fixes (no dark squares) */
-h1{ text-align:center;margin-bottom:0.6rem; font-weight:600; }
-.select,select{width:100%}
-select,button{padding:0.8rem;border-radius:8px;border:1px solid #ddd;font-size:1rem;margin-bottom:0.8rem}
-button{background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700}
-button:disabled{opacity:.5;cursor:not-allowed}
-button.roundBtn{background:var(--green);font-size:1.05rem;padding:1rem}
-.table{width:100%;border-collapse:collapse;margin-top:0.6rem}
-.table th,.table td{padding:0.6rem;text-align:center;border-bottom:1px solid #eee}
-.table th{background:#fafbfd}
-.chart-container{height:360px;margin-top:1rem;padding:0.6rem;background:transparent}
-.controls{display:flex;gap:0.8rem}
-.controls button.reset{background:var(--red)}
-.waiting{color:var(--orange);text-align:center;margin-top:0.5rem;font-weight:700}
-.live{color:var(--green);font-weight:700}
+h1 { text-align:center; margin-bottom:1rem; }
+select, button { width:100%; padding:0.9rem; border-radius:8px; border:none; margin-bottom:1rem; font-size:1rem;}
+select { background:#333; color:white; }
+button { background: var(--accent); color:white; font-weight:bold; cursor:pointer; transition:0.2s;}
+button:hover:not(:disabled){ background:#357abd; transform:scale(1.02);}
+button:disabled{ opacity:0.5; cursor:not-allowed; }
+button.roundBtn{ background: var(--green); font-size:1.2rem; padding:1.2rem; margin-top:1.5rem; }
+.score-table { width:100%; border-collapse:collapse; margin-top:1rem; font-size:1rem;}
+.score-table th, .score-table td{ padding:0.8rem; text-align:center; border-bottom:1px solid #444;}
+.score-table th { background:#222; }
+.live { color: var(--green); font-weight:bold; }
+.waiting { color: var(--orange); font-weight:bold; text-align:center; margin-top:0.5rem; }
+.btn-group { display:flex; gap:1rem; margin-top:1rem; justify-content:center; }
+.btn-group button{ flex:1; max-width:200px; }
+.btn-group button.reset { background: var(--red); }
+.chart-container{ background: rgba(26,26,46,0.95); border-radius:12px; padding:1rem; backdrop-filter:blur(10px); border:1px solid rgba(74,144,226,0.2); height:380px; margin-top:1.5rem;}
 </style>
 </head>
 <body>
 
-  <div class="card" id="mainCard">
-    <h1>Scores en direct <span class="live">Live</span></h1>
-    <p style="text-align:center">Round <span id="currentRound">—</span> / <span id="totalRounds">—</span></p>
-    <p id="votesStatus" class="waiting">En attente du lancement...</p>
+<div class="card">
+<h1>Scores en Direct <span class="live">Live</span></h1>
+<p style="text-align:center;">Round <span id="currentRound">—</span> / <span id="totalRounds">—</span></p>
+<p id="votesStatus" class="waiting">En attente du lancement...</p>
+<table class="score-table">
+<thead><tr><th>Nom</th><th>Points Round</th><th>Total</th></tr></thead>
+<tbody id="resultsTable"></tbody>
+</table>
+<div class="chart-container">
+<canvas id="scoresChart"></canvas>
+</div>
+<button id="roundControlBtn" class="roundBtn" disabled>Lancer Round</button>
+</div>
 
-    <table class="table" id="resultsTable">
-      <thead><tr><th>Nom</th><th>Points Round</th><th>Total</th></tr></thead>
-      <tbody></tbody>
-    </table>
-
-    <div class="chart-container"><canvas id="scoresChart"></canvas></div>
-
-    <div style="margin-top:1rem">
-      <button id="roundControlBtn" class="roundBtn" disabled>Lancer round</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h1>Configuration</h1>
-    <label>Nombre de joueurs (pair)</label>
-    <select id="numPlayers"><option>2</option><option>4</option><option>6</option><option>8</option><option>10</option></select>
-    <label>Nombre de rounds</label>
-    <select id="numRounds"></select>
-    <div class="controls" style="margin-top:0.6rem">
-      <button onclick="saveConfig()">Configurer</button>
-      <button class="reset" onclick="resetAll()">Réinitialiser</button>
-    </div>
-    <p id="status" style="text-align:center;margin-top:0.8rem">En attente de configuration...</p>
-  </div>
+<div class="card">
+<h1>Configuration du Jeu</h1>
+<label>Joueurs (pair)</label>
+<select id="numPlayers">
+<option value="2">2</option>
+<option value="4">4</option>
+<option value="6">6</option>
+<option value="8">8</option>
+<option value="10">10</option>
+</select>
+<label>Rounds</label>
+<select id="numRounds"><script>for(let i=10;i<=50;i+=5)document.write(`<option value="${i}">${i}</option>`);</script></select>
+<div class="btn-group">
+<button onclick="saveConfig()">Configurer</button>
+<button class="reset" onclick="resetAll()">Réinitialiser</button>
+</div>
+<p id="status" style="text-align:center; margin-top:1rem;">En attente de configuration...</p>
+</div>
 
 <script>
-/* ---------- Firebase config (conserve le tien) ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyBREaX2qwor0mO6Q4xAVOVERuQmYYeKWfw",
   authDomain: "jeu-prisonnier.firebaseapp.com",
@@ -103,169 +91,100 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
-/* ---------- Helpers ---------- */
 const payoffs = { 'CC':3,'CD':0,'DC':5,'DD':1 };
-let scoresChart = null;
+let scoresChart=null;
 
-/* populate rounds select */
-(function initRounds(){
-  const sel = document.getElementById('numRounds');
-  for(let i=10;i<=50;i+=5){ const opt=document.createElement('option'); opt.value=i; opt.textContent=i; sel.appendChild(opt); }
-})();
-
-/* ---------- CONFIGURATION: write to /config and /game ---------- */
 async function saveConfig(){
-  const players = parseInt(document.getElementById('numPlayers').value);
-  const rounds = parseInt(document.getElementById('numRounds').value);
-  if(players % 2 !== 0) return alert('Nombre de joueurs doit être pair !');
-
-  // shuffle ids and create paires
-  let ids = Array.from({length:players}, (_,i)=>i+1);
+  const players=parseInt(document.getElementById('numPlayers').value);
+  const rounds=parseInt(document.getElementById('numRounds').value);
+  if(players%2!==0) return alert("Nombre de joueurs doit être pair !");
+  const ids=Array.from({length:players},(_,i)=>i+1);
   for(let i=ids.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
-  const paires = {};
-  for(let i=0;i<ids.length;i+=2){ paires[ids[i]] = ids[i+1]; paires[ids[i+1]] = ids[i]; }
+  const paires={}; for(let i=0;i<ids.length;i+=2){ paires[ids[i]]=ids[i+1]; paires[ids[i+1]]=ids[i]; }
 
-  // initial game object (matching joueur.html expectation)
-  const game = {
-    currentRound: 1,
-    roundActive: false,
-    paires,
-    votes: {},
-    scores: {},
-    names: {},
-    usedIds: {}
-  };
-  for(let i=1;i<=players;i++) game.scores[i] = { total:0, round:0 };
+  const newState={round:1, scores:{}, paires, names:{}, votes:{}, roundStarted:false};
+  for(let i=1;i<=players;i++) newState.scores[i]={total:0, round:0};
 
-  await db.ref('config').set({ players, rounds });
-  await db.ref('game').set(game);
+  await db.ref('config').set({players,rounds});
+  await db.ref('game').set(newState);
 
-  document.getElementById('status').innerHTML = `<strong style="color:green">Configuration OK.</strong>`;
-  document.getElementById('roundControlBtn').disabled = false;
+  document.getElementById('roundControlBtn').disabled=false;
+  document.getElementById('status').innerHTML=`<strong style="color:#9b59b6">Configuration OK.</strong>`;
 }
 
-/* ---------- ROUND control (start/end) ---------- */
+// Lancer / passer round
 document.getElementById('roundControlBtn').addEventListener('click', async ()=>{
-  const cfgSnap = await db.ref('config').once('value');
-  const config = cfgSnap.val() || {};
-  const gameSnap = await db.ref('game').once('value');
-  const game = gameSnap.val() || {};
-
-  if(!game.roundActive){
-    // start round: set roundActive true and clear votes
-    await db.ref('game').update({ roundActive:true, votes:{} });
-    return;
-  }
-
-  // end current round: compute points once
-  // ensure we don't double-add: store a 'roundsCounted' map in game
-  if(!game.roundsCounted) game.roundsCounted = {};
-  const r = game.currentRound || 1;
-  if(!game.roundsCounted[r]){
-    const updates = {};
-    for(let i=1;i<=config.players;i++){
-      const my = game.votes?.[i];
-      if(!my) continue;
-      const partner = game.paires?.[i];
-      const partnerVote = game.votes?.[partner];
-      if(!partner || !partnerVote) continue;
-      const pts = payoffs[my + partnerVote] || 0;
-      // accumulate totals safely via transaction per player
-      updates[`game/scores/${i}/round`] = pts;
-      // increment total using transaction to avoid race conditions
-      db.ref(`game/scores/${i}/total`).transaction(curr => (curr || 0) + pts);
+  const snap = await db.ref('game').once('value'); const state = snap.val();
+  if(!state) return;
+  if(!state.roundStarted){ // Lancer round
+    await db.ref('game').update({roundStarted:true,votes:{}});
+  } else { // Passer round
+    // Calcul scores
+    const votes = state.votes || {}; const paires = state.paires;
+    for(let i=1;i<=Object.keys(paires).length;i++){
+      const m = votes[i]; if(!m) continue;
+      const a = paires[i]; const ac = votes[a]||'—';
+      const p = payoffs[m+ac]||0;
+      await db.ref(`game/scores/${i}/round`).set(p);
+      await db.ref(`game/scores/${i}/total`).transaction(t=>(t||0)+p);
     }
-    // mark round counted
-    game.roundsCounted[r] = true;
-    await db.ref('game/roundsCounted').set(game.roundsCounted);
+    if(state.round>=document.getElementById('numRounds').value){
+      document.getElementById('roundControlBtn').disabled=true;
+      document.getElementById('roundControlBtn').innerText="Fin";
+      alert("Jeu terminé !");
+      return;
+    }
+    await db.ref('game').update({round:state.round+1,roundStarted:true,votes:{}});
   }
-
-  // if last round -> end
-  if(game.currentRound >= config.rounds){
-    await db.ref('game').update({ roundActive:false });
-    document.getElementById('roundControlBtn').innerText = 'Fin';
-    document.getElementById('roundControlBtn').disabled = true;
-    alert('Jeu terminé !');
-    return;
-  }
-
-  // otherwise advance round and reset votes, set roundActive false (players wait)
-  await db.ref('game').update({ currentRound: (game.currentRound || 1) + 1, votes: {}, roundActive:false });
 });
 
-/* ---------- Reset ---------- */
-async function resetAll(){
-  if(!confirm('Tout sera effacé.')) return;
-  await db.ref().set({ config:{}, game:{ currentRound:1, roundActive:false, paires:{}, votes:{}, scores:{}, names:{}, usedIds:{}, roundsCounted:{} } });
+// Affichage
+db.ref('config').on('value', configSnap=>{
+  db.ref('game').on('value', gameSnap=>{
+    const config=configSnap.val()||{}; const state=gameSnap.val()||{};
+    document.getElementById('currentRound').innerText=state.round||1;
+    document.getElementById('totalRounds').innerText=config.rounds||0;
+
+    const tbody=document.getElementById('resultsTable'); tbody.innerHTML='';
+    let votesCount=0;
+    for(let i=1;i<=config.players;i++){
+      const s=state.scores?.[i]||{round:0,total:0};
+      const name=state.names?.[i]||`Joueur ${i}`;
+      if(state.votes?.[i]) votesCount++;
+      tbody.innerHTML+=`<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
+    }
+
+    const btn=document.getElementById('roundControlBtn');
+    if(state.round>=config.rounds){ btn.innerText="Fin"; btn.disabled=true; }
+    else if(!state.roundStarted){ btn.innerText="Lancer Round"; btn.disabled=false; }
+    else { btn.innerText="Passer au round suivant"; btn.disabled=votesCount<config.players; }
+
+    document.getElementById('votesStatus').innerText=state.roundStarted
+      ? `${votesCount}/${config.players} votes`
+      : "En attente du lancement";
+
+    updateScoresChart(state,config.players);
+  });
+});
+
+function resetAll(){
+  if(!confirm("Tout sera effacé.")) return;
+  db.ref('config').set({});
+  db.ref('game').set({round:1,scores:{},paires:{},names:{},votes:{},roundStarted:false});
+  document.getElementById('status').innerHTML=`<strong style="color:#e74c3c">Réinitialisé !</strong>`;
+  document.getElementById('roundControlBtn').innerText="Lancer Round";
+  document.getElementById('roundControlBtn').disabled=true;
   if(scoresChart) scoresChart.destroy();
-  document.getElementById('roundControlBtn').innerText = 'Lancer round';
-  document.getElementById('roundControlBtn').disabled = true;
-  document.getElementById('resultsTable').querySelector('tbody').innerHTML = '';
-  document.getElementById('status').innerHTML = 'En attente de configuration...';
 }
 
-/* ---------- Real-time sync: listen game & config ---------- */
-db.ref('config').on('value', cfgSnap => {
-  const cfg = cfgSnap.val() || {};
-  document.getElementById('totalRounds').innerText = cfg.rounds || '—';
-});
-
-db.ref('game').on('value', async gameSnap => {
-  const game = gameSnap.val() || {};
-  const cfgSnap = await db.ref('config').once('value'); const cfg = cfgSnap.val() || {};
-  if(!cfg.players) return;
-
-  // update round counters
-  document.getElementById('currentRound').innerText = game.currentRound || 1;
-  document.getElementById('totalRounds').innerText = cfg.rounds || '—';
-
-  // build table
-  const tbodyEl = document.getElementById('resultsTable').querySelector('tbody');
-  tbodyEl.innerHTML = '';
-  let votesCount = 0;
-  for(let i=1;i<=cfg.players;i++){
-    if(game.votes?.[i]) votesCount++;
-    const name = game.names?.[i] || `Joueur ${i}`;
-    const s = game.scores?.[i] || { round:0, total:0 };
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td>`;
-    tbodyEl.appendChild(tr);
-  }
-
-  // button state
-  const btn = document.getElementById('roundControlBtn');
-  if(game.currentRound >= (cfg.rounds || 0)){ btn.innerText='Fin'; btn.disabled = true; }
-  else if(!game.roundActive){ btn.innerText='Lancer round'; btn.disabled = false; }
-  else { btn.innerText='Passer au round suivant'; btn.disabled = votesCount < cfg.players; }
-
-  // votes status
-  document.getElementById('votesStatus').innerText = game.roundActive ? `${votesCount}/${cfg.players} votes` : 'En attente du lancement';
-
-  // chart update
-  updateScoresChart(game, cfg.players);
-});
-
-/* ---------- Chart ---------- */
-function updateScoresChart(game, n){
-  const ctx = document.getElementById('scoresChart').getContext('2d');
-  const labels = [], data = [];
-  const colors = ['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
-  for(let i=1;i<=n;i++){
-    labels.push(game.names?.[i] || `Joueur ${i}`);
-    data.push(game.scores?.[i]?.total || 0);
-  }
-  const cfg = {
-    type:'bar',
-    data:{ labels, datasets:[{ data, backgroundColor: colors.slice(0,n), borderWidth:1 }] },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, title:{display:true,text:'Totaux scores',font:{size:16}} },
-      scales:{ y:{ beginAtZero:true }, x:{ } }
-    }
-  };
+let scoresChart=null;
+function updateScoresChart(state,numPlayers){
+  const ctx=document.getElementById('scoresChart').getContext('2d');
+  const labels=[]; const data=[]; const colors=['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
+  for(let i=1;i<=numPlayers;i++){ labels.push(state.names?.[i]||`Joueur ${i}`); data.push(state.scores?.[i]?.total||0); }
+  const config={type:'bar',data:{labels,datasets:[{data,backgroundColor:colors.slice(0,numPlayers),borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:800},plugins:{legend:{display:false},title:{display:true,text:'Scores Totaux',color:'#0f0f1a'}},scales:{y:{beginAtZero:true,ticks:{color:'#0f0f1a'}},x:{ticks:{color:'#0f0f1a'}}}}};
   if(scoresChart) scoresChart.destroy();
-  scoresChart = new Chart(ctx, cfg);
+  scoresChart=new Chart(ctx,config);
 }
 </script>
 </body>
