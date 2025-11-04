@@ -65,7 +65,6 @@
     .choice-btn:disabled {
       opacity: 0.5; cursor: not-allowed; background: #555 !important;
     }
-    .feedback { margin: 1.5rem 0; font-size: 1.1rem; }
     .progress {
       height: 8px; background: #333;
       border-radius: 4px; overflow: hidden; margin: 1rem 0;
@@ -99,7 +98,7 @@
         <button id="btnCoop" class="choice-btn coop" onclick="vote('C')" disabled>Coopérer</button>
         <button id="btnTrahir" class="choice-btn trahir" onclick="vote('D')" disabled>Trahir</button>
       </div>
-      <div id="feedback" class="feedback"></div>
+      <!-- FEEDBACK SUPPRIMÉ -->
     </div>
   </div>
 
@@ -120,7 +119,6 @@
     // --- Variables globales ---
     let playerName = null;
     let playerId = null;
-    const payoffs = { 'CC': 3, 'CD': 0, 'DC': 5, 'DD': 1 };
 
     // --- Sauvegarde joueur ---
     function savePlayer() {
@@ -181,8 +179,6 @@
         const round = game.currentRound || game.round || 1;
         const active = game.roundActive === true;
         const votes = game.votes || {};
-        const pairs = game.paires || {};
-        const scores = game.scores || {};
 
         document.getElementById('currentRound').innerText = round;
         updateProgress(round, configSnap?.val()?.rounds || 10);
@@ -196,23 +192,6 @@
         document.getElementById('roundStatus').innerText = !active
           ? "En attente du modérateur..."
           : hasVoted ? "Vote enregistré !" : "Votre tour !";
-
-        if (hasVoted && pairs[playerId] && votes[pairs[playerId]]) {
-          const myVote = votes[playerId];
-          const oppVote = votes[pairs[playerId]];
-          const payoffSelf = payoffs[myVote + oppVote] || 0;
-          const payoffOpp = payoffs[oppVote + myVote] || 0;
-          const advName = game.names?.[pairs[playerId]] || `ID ${pairs[playerId]}`;
-          const total = (scores[playerId]?.total || 0) + payoffSelf;
-
-          document.getElementById('feedback').innerHTML = `
-            <strong>Vous : ${payoffSelf} pts</strong> |
-            <strong>${advName} : ${payoffOpp} pts</strong><br>
-            <small>Total estimé : ${total} pts</small>
-          `;
-        } else {
-          document.getElementById('feedback').innerHTML = '';
-        }
       });
     }
 
