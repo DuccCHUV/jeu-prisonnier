@@ -9,8 +9,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root { 
-  --bg: #0f0f1a; --card: rgba(255,255,255,0.95); --accent: #4a90e2; --text: #0f0f1a; 
-  --green: #2ecc71; --red: #e74c3c; --orange: #f39c12; 
+  --bg: #0f0f1a; 
+  --card: rgba(26,26,46,0.92); 
+  --accent: #4a90e2; 
+  --text: #e0e0e0; 
+  --green: #2ecc71; 
+  --red: #e74c3c; 
+  --orange: #f39c12; 
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { 
@@ -23,8 +28,10 @@ body::before {
   background: rgba(15,15,26,0.4); z-index: -1;
 }
 .card { 
-  background: var(--card); border-radius:16px; padding:2rem; box-shadow:0 8px 32px rgba(0,0,0,0.4);
-  max-width:900px; margin:0 auto; border:1px solid rgba(74,144,226,0.2); z-index:1;
+  background: var(--card); 
+  backdrop-filter: blur(12px);
+  border-radius: 16px; padding: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  max-width: 900px; margin: 0 auto; border:1px solid rgba(74,144,226,0.2); z-index:1;
 }
 h1 { text-align:center; margin-bottom:1rem; }
 select, button { width:100%; padding:0.9rem; border-radius:8px; border:none; margin-bottom:1rem; font-size:1rem;}
@@ -38,10 +45,12 @@ button.roundBtn{ background: var(--green); font-size:1.2rem; padding:1.2rem; mar
 .score-table th { background:#222; }
 .live { color: var(--green); font-weight:bold; }
 .waiting { color: var(--orange); font-weight:bold; text-align:center; margin-top:0.5rem; }
-.btn-group { display:flex; gap:1rem; margin-top:1rem; justify-content:center; }
-.btn-group button{ flex:1; max-width:200px; }
+.btn-group { display:flex; gap:1rem; margin-top:1rem; }
+.btn-group button{ flex:1; }
 .btn-group button.reset { background: var(--red); }
-.chart-container{ background: rgba(26,26,46,0.95); border-radius:12px; padding:1rem; backdrop-filter:blur(10px); border:1px solid rgba(74,144,226,0.2); height:380px; margin-top:1.5rem;}
+.btn-group button.reset:hover{ background:#c0392b; }
+#scoresChart{ position:relative; height:400px; margin:2rem auto; max-width:100%; }
+.chart-container{ background: var(--card); border-radius:12px; padding:1rem; backdrop-filter:blur(10px); border:1px solid rgba(74,144,226,0.2);}
 </style>
 </head>
 <body>
@@ -71,7 +80,9 @@ button.roundBtn{ background: var(--green); font-size:1.2rem; padding:1.2rem; mar
 <option value="10">10</option>
 </select>
 <label>Rounds</label>
-<select id="numRounds"><script>for(let i=10;i<=50;i+=5)document.write(`<option value="${i}">${i}</option>`);</script></select>
+<select id="numRounds">
+<script>for(let i=10;i<=50;i+=5)document.write(`<option value="${i}">${i}</option>`);</script>
+</select>
 <div class="btn-group">
 <button onclick="saveConfig()">Configurer</button>
 <button class="reset" onclick="resetAll()">Réinitialiser</button>
@@ -80,6 +91,10 @@ button.roundBtn{ background: var(--green); font-size:1.2rem; padding:1.2rem; mar
 </div>
 
 <script>
+const payoffs = { 'CC':3,'CD':0,'DC':5,'DD':1 };
+let scoresChart = null;
+
+// --- Firebase ---
 const firebaseConfig = {
   apiKey: "AIzaSyBREaX2qwor0mO6Q4xAVOVERuQmYYeKWfw",
   authDomain: "jeu-prisonnier.firebaseapp.com",
@@ -91,101 +106,109 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const payoffs = { 'CC':3,'CD':0,'DC':5,'DD':1 };
-let scoresChart=null;
 
+// ================== Config ==================
 async function saveConfig(){
-  const players=parseInt(document.getElementById('numPlayers').value);
-  const rounds=parseInt(document.getElementById('numRounds').value);
+  const players = parseInt(document.getElementById('numPlayers').value);
+  const rounds = parseInt(document.getElementById('numRounds').value);
   if(players%2!==0) return alert("Nombre de joueurs doit être pair !");
-  const ids=Array.from({length:players},(_,i)=>i+1);
+  const ids = Array.from({length:players},(_,i)=>i+1);
   for(let i=ids.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
   const paires={}; for(let i=0;i<ids.length;i+=2){ paires[ids[i]]=ids[i+1]; paires[ids[i+1]]=ids[i]; }
+  const newState = { round:1, scores:{}, paires, names:{}, votes:{}, roundStarted:false };
+  for(let i=1;i<=players;i++) newState.scores[i]={ total:0, round:0 };
 
-  const newState={round:1, scores:{}, paires, names:{}, votes:{}, roundStarted:false};
-  for(let i=1;i<=players;i++) newState.scores[i]={total:0, round:0};
-
-  await db.ref('config').set({players,rounds});
-  await db.ref('game').set(newState);
-
+  await db.ref().set({ config:{players,rounds}, game:newState });
   document.getElementById('roundControlBtn').disabled=false;
   document.getElementById('status').innerHTML=`<strong style="color:#9b59b6">Configuration OK.</strong>`;
 }
 
-// Lancer / passer round
-document.getElementById('roundControlBtn').addEventListener('click', async ()=>{
-  const snap = await db.ref('game').once('value'); const state = snap.val();
-  if(!state) return;
-  if(!state.roundStarted){ // Lancer round
-    await db.ref('game').update({roundStarted:true,votes:{}});
-  } else { // Passer round
-    // Calcul scores
-    const votes = state.votes || {}; const paires = state.paires;
-    for(let i=1;i<=Object.keys(paires).length;i++){
-      const m = votes[i]; if(!m) continue;
-      const a = paires[i]; const ac = votes[a]||'—';
-      const p = payoffs[m+ac]||0;
-      await db.ref(`game/scores/${i}/round`).set(p);
-      await db.ref(`game/scores/${i}/total`).transaction(t=>(t||0)+p);
-    }
-    if(state.round>=document.getElementById('numRounds').value){
-      document.getElementById('roundControlBtn').disabled=true;
-      document.getElementById('roundControlBtn').innerText="Fin";
-      alert("Jeu terminé !");
-      return;
-    }
-    await db.ref('game').update({round:state.round+1,roundStarted:true,votes:{}});
+// ================== Round ==================
+async function nextRoundLogic(){
+  const snap = await db.ref('game').once('value');
+  const game = snap.val();
+  if(!game) return;
+
+  if(!game.roundStarted){
+    await db.ref('game').update({ roundStarted:true, votes:{} });
+    document.getElementById('roundControlBtn').innerText="Passer au round suivant";
+    document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${game.round} lancé !</strong>`;
+    return;
   }
-});
 
-// Affichage
-db.ref('config').on('value', configSnap=>{
-  db.ref('game').on('value', gameSnap=>{
-    const config=configSnap.val()||{}; const state=gameSnap.val()||{};
-    document.getElementById('currentRound').innerText=state.round||1;
-    document.getElementById('totalRounds').innerText=config.rounds||0;
+  // Calcul points round
+  const updates = {};
+  for(let i in game.votes){
+    const a = game.paires[i];
+    const m = game.votes[i]; if(!m) continue;
+    const ac = game.votes[a] || '—';
+    const p = payoffs[m+ac]||0;
+    updates[`scores/${i}/round`] = p;
+    updates[`scores/${i}/total`] = (game.scores[i]?.total||0) + p;
+  }
+  await db.ref('game').update(updates);
+  await db.ref('game').update({ roundStarted:false });
 
-    const tbody=document.getElementById('resultsTable'); tbody.innerHTML='';
-    let votesCount=0;
-    for(let i=1;i<=config.players;i++){
-      const s=state.scores?.[i]||{round:0,total:0};
-      const name=state.names?.[i]||`Joueur ${i}`;
-      if(state.votes?.[i]) votesCount++;
-      tbody.innerHTML+=`<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
-    }
+  // Next round
+  if(game.round >= (await db.ref('config/rounds').once('value')).val()){
+    document.getElementById('roundControlBtn').innerText="Fin"; document.getElementById('roundControlBtn').disabled=true;
+    alert("Jeu terminé !");
+    return;
+  }
+  await db.ref('game').update({ round:game.round+1, votes:{}, roundStarted:false });
+}
+document.getElementById('roundControlBtn').addEventListener('click',nextRoundLogic);
 
-    const btn=document.getElementById('roundControlBtn');
-    if(state.round>=config.rounds){ btn.innerText="Fin"; btn.disabled=true; }
-    else if(!state.roundStarted){ btn.innerText="Lancer Round"; btn.disabled=false; }
-    else { btn.innerText="Passer au round suivant"; btn.disabled=votesCount<config.players; }
-
-    document.getElementById('votesStatus').innerText=state.roundStarted
-      ? `${votesCount}/${config.players} votes`
-      : "En attente du lancement";
-
-    updateScoresChart(state,config.players);
-  });
-});
-
+// ================== Reset ==================
 function resetAll(){
   if(!confirm("Tout sera effacé.")) return;
-  db.ref('config').set({});
-  db.ref('game').set({round:1,scores:{},paires:{},names:{},votes:{},roundStarted:false});
+  db.ref().set({ config:{}, game:{ round:1, scores:{}, paires:{}, names:{}, votes:{}, roundStarted:false } });
   document.getElementById('status').innerHTML=`<strong style="color:#e74c3c">Réinitialisé !</strong>`;
   document.getElementById('roundControlBtn').innerText="Lancer Round";
   document.getElementById('roundControlBtn').disabled=true;
   if(scoresChart) scoresChart.destroy();
 }
 
-let scoresChart=null;
-function updateScoresChart(state,numPlayers){
+// ================== Update tableau + graphique ==================
+db.ref().on('value',snap=>{
+  const data = snap.val()||{};
+  const config = data.config||{};
+  const game = data.game||{};
+
+  // Tableau
+  const tbody = document.getElementById('resultsTable'); tbody.innerHTML='';
+  let votesCount=0;
+  for(let i=1;i<=config.players;i++){
+    const s = game.scores?.[i]||{ round:0,total:0 };
+    const name = game.names?.[i]||`Joueur ${i}`;
+    if(game.votes?.[i]) votesCount++;
+    tbody.innerHTML+=`<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
+  }
+
+  const btn=document.getElementById('roundControlBtn');
+  if(game.round >= config.rounds){ btn.innerText="Fin"; btn.disabled=true; }
+  else if(!game.roundStarted){ btn.innerText="Lancer Round"; btn.disabled=false; }
+  else { btn.innerText="Passer au round suivant"; btn.disabled = votesCount < config.players; }
+
+  document.getElementById('votesStatus').innerText = game.roundStarted ? `${votesCount}/${config.players} votes` : "En attente du lancement";
+
+  // Graphique
   const ctx=document.getElementById('scoresChart').getContext('2d');
-  const labels=[]; const data=[]; const colors=['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
-  for(let i=1;i<=numPlayers;i++){ labels.push(state.names?.[i]||`Joueur ${i}`); data.push(state.scores?.[i]?.total||0); }
-  const config={type:'bar',data:{labels,datasets:[{data,backgroundColor:colors.slice(0,numPlayers),borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:800},plugins:{legend:{display:false},title:{display:true,text:'Scores Totaux',color:'#0f0f1a'}},scales:{y:{beginAtZero:true,ticks:{color:'#0f0f1a'}},x:{ticks:{color:'#0f0f1a'}}}}};
+  const labels=[]; const points=[];
+  const colors=['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
+  for(let i=1;i<=config.players;i++){ labels.push(game.names?.[i]||`Joueur ${i}`); points.push(game.scores?.[i]?.total||0); }
+
+  const chartConfig={ type:'bar', data:{ labels, datasets:[{ data:points, backgroundColor:colors.slice(0,config.players), borderWidth:1 }] }, 
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, title:{ display:true, text:'Scores Totaux', color:'#e0e0e0' } },
+      scales:{ y:{ beginAtZero:true, ticks:{ color:'#e0e0e0' } }, x:{ ticks:{ color:'#e0e0e0' } } } } };
+
   if(scoresChart) scoresChart.destroy();
-  scoresChart=new Chart(ctx,config);
-}
+  scoresChart = new Chart(ctx,chartConfig);
+
+  document.getElementById('currentRound').innerText = game.round||1;
+  document.getElementById('totalRounds').innerText = config.rounds||0;
+});
 </script>
 </body>
 </html>
