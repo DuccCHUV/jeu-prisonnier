@@ -115,7 +115,17 @@ async function saveConfig(){
   const ids = Array.from({length:players},(_,i)=>i+1);
   for(let i=ids.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
   const paires={}; for(let i=0;i<ids.length;i+=2){ paires[ids[i]]=ids[i+1]; paires[ids[i+1]]=ids[i]; }
-  const newState = { round:1, scores:{}, paires, names:{}, votes:{}, roundStarted:false };
+  
+  const newState = { 
+    round: 1, 
+    currentRound: 1,
+    roundStarted: false, 
+    roundActive: false,
+    scores: {}, 
+    paires, 
+    names: {}, 
+    votes: {} 
+  };
   for(let i=1;i<=players;i++) newState.scores[i]={ total:0, round:0 };
 
   await db.ref().set({ config:{players,rounds}, game:newState });
@@ -130,7 +140,12 @@ async function nextRoundLogic(){
   if(!game) return;
 
   if(!game.roundStarted){
-    await db.ref('game').update({ roundStarted:true, votes:{} });
+    await db.ref('game').update({ 
+      roundStarted: true, 
+      roundActive: true,
+      currentRound: game.round,
+      votes: {} 
+    });
     document.getElementById('roundControlBtn').innerText="Passer au round suivant";
     document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${game.round} lancé !</strong>`;
     return;
@@ -147,22 +162,37 @@ async function nextRoundLogic(){
     updates[`scores/${i}/total`] = (game.scores[i]?.total||0) + p;
   }
   await db.ref('game').update(updates);
-  await db.ref('game').update({ roundStarted:false });
 
-  // Next round
-  if(game.round >= (await db.ref('config/rounds').once('value')).val()){
-    document.getElementById('roundControlBtn').innerText="Fin"; document.getElementById('roundControlBtn').disabled=true;
+  const nextRoundNum = game.round + 1;
+  const configSnap = await db.ref('config/rounds').once('value');
+  const totalRounds = configSnap.val();
+
+  if (game.round >= totalRounds) {
+    await db.ref('game').update({ 
+      roundStarted: false, 
+      roundActive: false, 
+      votes: {} 
+    });
+    document.getElementById('roundControlBtn').innerText="Fin"; 
+    document.getElementById('roundControlBtn').disabled=true;
     alert("Jeu terminé !");
     return;
   }
-  await db.ref('game').update({ round:game.round+1, votes:{}, roundStarted:false });
+
+  await db.ref('game').update({ 
+    round: nextRoundNum,
+    currentRound: nextRoundNum,
+    roundStarted: false,
+    roundActive: false,
+    votes: {}
+  });
 }
-document.getElementById('roundControlBtn').addEventListener('click',nextRoundLogic);
+document.getElementById('roundControlBtn').addEventListener('click', nextRoundLogic);
 
 // ================== Reset ==================
 function resetAll(){
   if(!confirm("Tout sera effacé.")) return;
-  db.ref().set({ config:{}, game:{ round:1, scores:{}, paires:{}, names:{}, votes:{}, roundStarted:false } });
+  db.ref().set({ config:{}, game:{ round:1, currentRound:1, scores:{}, paires:{}, names:{}, votes:{}, roundStarted:false, roundActive:false } });
   document.getElementById('status').innerHTML=`<strong style="color:#e74c3c">Réinitialisé !</strong>`;
   document.getElementById('roundControlBtn').innerText="Lancer Round";
   document.getElementById('roundControlBtn').disabled=true;
@@ -170,44 +200,59 @@ function resetAll(){
 }
 
 // ================== Update tableau + graphique ==================
-db.ref().on('value',snap=>{
-  const data = snap.val()||{};
-  const config = data.config||{};
-  const game = data.game||{};
+db.ref().on('value', snap => {
+  const data = snap.val() || {};
+  const config = data.config || {};
+  const game = data.game || {};
 
   // Tableau
   const tbody = document.getElementById('resultsTable'); tbody.innerHTML='';
-  let votesCount=0;
-  for(let i=1;i<=config.players;i++){
-    const s = game.scores?.[i]||{ round:0,total:0 };
-    const name = game.names?.[i]||`Joueur ${i}`;
+  let votesCount = 0;
+  for(let i=1; i<=config.players; i++){
+    const s = game.scores?.[i] || { round:0, total:0 };
+    const name = game.names?.[i] || `Joueur ${i}`;
     if(game.votes?.[i]) votesCount++;
-    tbody.innerHTML+=`<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
+    tbody.innerHTML += `<tr><td><strong>${name}</strong></td><td><strong>${s.round}</strong></td><td><strong>${s.total}</strong></td></tr>`;
   }
 
-  const btn=document.getElementById('roundControlBtn');
-  if(game.round >= config.rounds){ btn.innerText="Fin"; btn.disabled=true; }
-  else if(!game.roundStarted){ btn.innerText="Lancer Round"; btn.disabled=false; }
-  else { btn.innerText="Passer au round suivant"; btn.disabled = votesCount < config.players; }
+  const btn = document.getElementById('roundControlBtn');
+  if(game.round >= config.rounds){ 
+    btn.innerText="Fin"; btn.disabled=true; 
+  }
+  else if(!game.roundStarted){ 
+    btn.innerText="Lancer Round"; btn.disabled=false; 
+  }
+  else { 
+    btn.innerText="Passer au round suivant"; 
+    btn.disabled = votesCount < config.players; 
+  }
 
   document.getElementById('votesStatus').innerText = game.roundStarted ? `${votesCount}/${config.players} votes` : "En attente du lancement";
 
   // Graphique
-  const ctx=document.getElementById('scoresChart').getContext('2d');
-  const labels=[]; const points=[];
-  const colors=['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
-  for(let i=1;i<=config.players;i++){ labels.push(game.names?.[i]||`Joueur ${i}`); points.push(game.scores?.[i]?.total||0); }
+  const ctx = document.getElementById('scoresChart').getContext('2d');
+  const labels = []; const points = [];
+  const colors = ['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
+  for(let i=1; i<=config.players; i++){ 
+    labels.push(game.names?.[i] || `Joueur ${i}`); 
+    points.push(game.scores?.[i]?.total || 0); 
+  }
 
-  const chartConfig={ type:'bar', data:{ labels, datasets:[{ data:points, backgroundColor:colors.slice(0,config.players), borderWidth:1 }] }, 
-    options:{ responsive:true, maintainAspectRatio:false,
+  const chartConfig = { 
+    type:'bar', 
+    data:{ labels, datasets:[{ data:points, backgroundColor:colors.slice(0,config.players), borderWidth:1 }] }, 
+    options:{ 
+      responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:false }, title:{ display:true, text:'Scores Totaux', color:'#e0e0e0' } },
-      scales:{ y:{ beginAtZero:true, ticks:{ color:'#e0e0e0' } }, x:{ ticks:{ color:'#e0e0e0' } } } } };
+      scales:{ y:{ beginAtZero:true, ticks:{ color:'#e0e0e0' } }, x:{ ticks:{ color:'#e0e0e0' } } } 
+    } 
+  };
 
   if(scoresChart) scoresChart.destroy();
-  scoresChart = new Chart(ctx,chartConfig);
+  scoresChart = new Chart(ctx, chartConfig);
 
-  document.getElementById('currentRound').innerText = game.round||1;
-  document.getElementById('totalRounds').innerText = config.rounds||0;
+  document.getElementById('currentRound').innerText = game.currentRound || game.round || 1;
+  document.getElementById('totalRounds').innerText = config.rounds || 0;
 });
 </script>
 </body>
