@@ -38,7 +38,7 @@ select, button { width:100%; padding:0.9rem; border-radius:8px; border:none; mar
 select { background:#333; color:white; }
 button { background: var(--accent); color:white; font-weight:bold; cursor:pointer; transition:0.2s;}
 button:hover:not(:disabled){ background:#357abd; transform:scale(1.02);}
-button:disabled{ opacity:0.5; cursor:not-allowed; }
+button:disabled{ opacity:0.5; cursor:not-allowed; background:#555 !important; }
 button.roundBtn{ background: var(--green); font-size:1.2rem; padding:1.2rem; margin-top:1.5rem; }
 .score-table { width:100%; border-collapse:collapse; margin-top:1rem; font-size:1rem;}
 .score-table th, .score-table td{ padding:0.8rem; text-align:center; border-bottom:1px solid #444;}
@@ -163,6 +163,7 @@ async function nextRound(){
   if (game.round >= totalRounds) {
     document.getElementById('roundControlBtn').innerText="Fin du jeu"; 
     document.getElementById('roundControlBtn').disabled=true;
+    document.getElementById('roundControlBtn').style.background = "#555";
     alert("Jeu terminé !");
     return;
   }
@@ -179,12 +180,14 @@ async function nextRound(){
   document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${nextRoundNum} lancé !</strong>`;
 }
 
-// ================== Calcul auto des points quand tous ont voté ==================
+// ================== Calcul auto des points + FIN AUTOMATIQUE ==================
 async function autoCalculatePoints(){
   const gameSnap = await db.ref('game').once('value');
   const game = gameSnap.val();
-  const configSnap = await db.ref('config/players').once('value');
-  const totalPlayers = configSnap.val();
+  const configSnap = await db.ref('config').once('value');
+  const config = configSnap.val();
+
+  const isLastRound = game.round === config.rounds;
 
   const updates = {};
   for(let i in game.votes){
@@ -197,9 +200,18 @@ async function autoCalculatePoints(){
   }
   await db.ref('game').update(updates);
   await db.ref('game').update({ roundStarted: false, roundActive: false });
-  
-  // Bouton prêt pour le round suivant
-  document.getElementById('roundControlBtn').innerText="Lancer le round suivant";
+
+  if (isLastRound) {
+    const btn = document.getElementById('roundControlBtn');
+    btn.innerText = "Fin du jeu";
+    btn.disabled = true;
+    btn.style.background = "#555";
+    btn.style.cursor = "not-allowed";
+    alert("Jeu terminé !");
+    return;
+  }
+
+  document.getElementById('roundControlBtn').innerText = "Lancer le round suivant";
   document.getElementById('roundControlBtn').disabled = false;
   document.getElementById('roundControlBtn').onclick = nextRound;
 }
@@ -212,16 +224,16 @@ function resetAll(){
   document.getElementById('roundControlBtn').innerText="Lancer Round";
   document.getElementById('roundControlBtn').disabled=true;
   document.getElementById('roundControlBtn').onclick = null;
+  document.getElementById('roundControlBtn').style.background = "";
   if(scoresChart) scoresChart.destroy();
 }
 
-// ================== Écoute Firebase + Auto-calcul ==================
+// ================== Écoute Firebase + Auto-calcul + Fin auto ==================
 db.ref().on('value', snap => {
   const data = snap.val() || {};
   const config = data.config || {};
   const game = data.game || {};
 
-  // --- Tableau ---
   const tbody = document.getElementById('resultsTable'); tbody.innerHTML='';
   let votesCount = 0;
   for(let i=1; i<=config.players; i++){
@@ -234,10 +246,12 @@ db.ref().on('value', snap => {
   const btn = document.getElementById('roundControlBtn');
 
   // --- Gestion du bouton ---
-  if (game.round >= config.rounds) {
+  if (game.round > config.rounds) {
     btn.innerText = "Fin du jeu"; 
     btn.disabled = true;
     btn.onclick = null;
+    btn.style.background = "#555";
+    btn.style.cursor = "not-allowed";
   } 
   else if (!game.roundStarted && !game.roundActive) {
     btn.innerText = "Lancer Round";
@@ -272,7 +286,7 @@ db.ref().on('value', snap => {
       window.calculating = true;
       setTimeout(() => {
         autoCalculatePoints().finally(() => window.calculating = false);
-      }, 1500); // 1.5s pour voir les résultats
+      }, 1500);
     }
   }
 
