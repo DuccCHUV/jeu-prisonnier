@@ -3,25 +3,77 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Joueur - Prisonnier</title>
+  <title>Joueur - Dilemme du prisonnier</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
-    :root { --bg: #0f0f1a; --card: #1a1a2e; --accent: #4a90e2; --text: #e0e0e0; --green: #2ecc71; --red: #e74c3c; }
+    :root {
+      --bg: #0f0f1a;
+      --card: rgba(26,26,46,0.92);
+      --accent: #4a90e2;
+      --text: #e0e0e0;
+      --green: #2ecc71;
+      --red: #e74c3c;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: url('image.jpg') center center / cover no-repeat fixed; color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; position: relative; }
-    body::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 15, 26, 0.5); z-index: -1; }
-    .card { background: rgba(26, 26, 46, 0.92); backdrop-filter: blur(12px); border-radius: 16px; padding: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 500px; width: 100%; text-align: center; border: 1px solid rgba(74, 144, 226, 0.2); z-index: 1; }
+    body {
+      background: url('image.jpg') center center / cover no-repeat fixed;
+      color: var(--text);
+      font-family: 'Segoe UI', sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 100vh; padding: 2rem; position: relative;
+    }
+    body::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,15,26,0.5); z-index: -1;
+    }
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      border: 1px solid rgba(74,144,226,0.2);
+      z-index: 1;
+    }
     h1 { margin-bottom: 1rem; }
-    input, button { width: 100%; padding: 0.9rem; border-radius: 8px; border: none; margin: 0.8rem 0; font-size: 1rem; }
+    input, button {
+      width: 100%;
+      padding: 0.9rem;
+      border-radius: 8px;
+      border: none;
+      margin: 0.8rem 0;
+      font-size: 1rem;
+    }
     input { background: #333; color: white; }
-    .choice-btn { font-size: 1.5rem; padding: 1.2rem; margin: 1rem 0.5rem; flex: 1; min-width: 140px; border: none; border-radius: 8px; cursor: pointer; }
+    .choice-btn {
+      font-size: 1.5rem;
+      padding: 1.2rem;
+      margin: 1rem 0.5rem;
+      flex: 1;
+      min-width: 140px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
     .choice-btn.coop { background: var(--green); }
     .choice-btn.trahir { background: var(--red); }
-    .choice-btn:disabled { opacity: 0.5; cursor: not-allowed; background: #555 !important; }
+    .choice-btn:disabled {
+      opacity: 0.5; cursor: not-allowed; background: #555 !important;
+    }
     .feedback { margin: 1.5rem 0; font-size: 1.1rem; }
-    .progress { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 1rem 0; }
-    .progress-bar { height: 100%; background: var(--accent); width: 0; transition: width 0.5s; }
+    .progress {
+      height: 8px; background: #333;
+      border-radius: 4px; overflow: hidden; margin: 1rem 0;
+    }
+    .progress-bar {
+      height: 100%; background: var(--accent);
+      width: 0; transition: width 0.5s;
+    }
     .locked { color: #f39c12; font-weight: bold; }
     .hidden { display: none; }
   </style>
@@ -29,6 +81,7 @@
 <body>
 
   <div class="card">
+    <!-- Page d'inscription -->
     <div id="setupPage">
       <h1>Choisissez NOM + ID</h1>
       <input id="playerName" placeholder="Votre nom (ex: Alice)" />
@@ -36,9 +89,10 @@
       <button onclick="savePlayer()">Confirmer</button>
     </div>
 
+    <!-- Page de jeu -->
     <div id="gamePage" class="hidden">
       <h1><span id="displayName">?</span> (ID <span id="displayId">?</span>)</h1>
-      <p>Round <span id="currentRound">1</span> / <span id="totalRounds">10</span></p>
+      <p>Round <span id="currentRound">1</span> / <span id="totalRounds">?</span></p>
       <div class="progress"><div id="progressBar" class="progress-bar"></div></div>
       <p id="roundStatus" class="locked">En attente du modérateur...</p>
       <div style="display: flex; justify-content: center; gap: 1rem; margin: 1.5rem 0;">
@@ -50,6 +104,7 @@
   </div>
 
   <script>
+    // --- Configuration Firebase ---
     const firebaseConfig = {
       apiKey: "AIzaSyBREaX2qwor0mO6Q4xAVOVERuQmYYeKWfw",
       authDomain: "jeu-prisonnier.firebaseapp.com",
@@ -62,28 +117,22 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // --- Variables globales ---
     let playerName = null;
     let playerId = null;
     const payoffs = { 'CC': 3, 'CD': 0, 'DC': 5, 'DD': 1 };
 
+    // --- Sauvegarde joueur ---
     function savePlayer() {
       playerName = document.getElementById('playerName').value.trim();
       playerId = parseInt(document.getElementById('playerIdInput').value);
-      if (!playerName || !playerId || playerId < 1 || playerId > 20) return alert("Nom + ID (1-20) requis !");
-
-      db.ref('state').once('value').then(snap => {
-        const state = snap.val() || {};
-        if (state.usedIds?.includes(playerId)) return alert("ID déjà pris !");
-
-        db.ref(`state/names/${playerId}`).set(playerName);
-        db.ref(`state/usedIds/${playerId}`).set(true);
-        db.ref(`state/scores/${playerId}`).set({ total: 0, round: 0 });
-
-        localStorage.setItem('playerData', JSON.stringify({ name: playerName, id: playerId }));
-        showGame();
-      });
+      if (!playerName || !playerId || playerId < 1 || playerId > 20)
+        return alert("Nom + ID (1-20) requis !");
+      localStorage.setItem('playerData', JSON.stringify({ name: playerName, id: playerId }));
+      showGame();
     }
 
+    // --- Chargement joueur ---
     function loadPlayer() {
       const saved = localStorage.getItem('playerData');
       if (saved) {
@@ -94,6 +143,7 @@
       }
     }
 
+    // --- Affiche la page de jeu ---
     function showGame() {
       document.getElementById('setupPage').classList.add('hidden');
       document.getElementById('gamePage').classList.remove('hidden');
@@ -102,54 +152,64 @@
       loadGameState();
     }
 
-    function vote(choix) {
-      db.ref(`state/votes/${playerId}`).set(choix);
-    }
-
+    // --- Écoute les changements Firebase ---
     function loadGameState() {
-      db.ref('config').on('value', configSnap => {
-        db.ref('state').on('value', stateSnap => {
-          const config = configSnap.val() || {};
-          const state = stateSnap.val() || {};
-          if (!config.rounds) return;
+      const configRef = db.ref('config');
+      const gameRef = db.ref('game');
 
-          document.getElementById('totalRounds').innerText = config.rounds;
-          document.getElementById('currentRound').innerText = state.round || 1;
+      configRef.on('value', configSnap => {
+        const config = configSnap.val() || {};
+        document.getElementById('totalRounds').innerText = config.rounds || '?';
+      });
 
-          const roundStarted = state.roundStarted === true;
-          const hasVoted = !!state.votes?.[playerId];
-          const locked = !roundStarted;
+      gameRef.on('value', gameSnap => {
+        const game = gameSnap.val() || {};
+        const round = game.currentRound || 1;
+        const active = game.roundActive === true;
+        const votes = game.votes || {};
+        const pairs = game.paires || {};
+        const scores = game.scores || {};
 
-          document.getElementById('btnCoop').disabled = locked || hasVoted;
-          document.getElementById('btnTrahir').disabled = locked || hasVoted;
+        document.getElementById('currentRound').innerText = round;
+        updateProgress(round, configSnap?.val()?.rounds || 10);
 
-          document.getElementById('roundStatus').innerText = !roundStarted
-            ? "En attente du modérateur..."
-            : hasVoted ? "Vote enregistré !" : "Votre tour !";
+        const hasVoted = !!votes[playerId];
+        const isLocked = !active;
 
-          if (hasVoted && roundStarted) showResult(state);
-          updateProgress(state, config);
-        });
+        document.getElementById('btnCoop').disabled = isLocked || hasVoted;
+        document.getElementById('btnTrahir').disabled = isLocked || hasVoted;
+
+        document.getElementById('roundStatus').innerText = !active
+          ? "En attente du modérateur..."
+          : hasVoted ? "Vote enregistré !" : "Votre tour !";
+
+        if (hasVoted && pairs[playerId] && votes[pairs[playerId]]) {
+          const myVote = votes[playerId];
+          const oppVote = votes[pairs[playerId]];
+          const payoffSelf = payoffs[myVote + oppVote] || 0;
+          const payoffOpp = payoffs[oppVote + myVote] || 0;
+          const advName = game.names?.[pairs[playerId]] || `ID ${pairs[playerId]}`;
+          const total = (scores[playerId]?.total || 0) + payoffSelf;
+
+          document.getElementById('feedback').innerHTML = `
+            <strong>Vous : ${payoffSelf} pts</strong> |
+            <strong>${advName} : ${payoffOpp} pts</strong><br>
+            <small>Total estimé : ${total} pts</small>
+          `;
+        } else {
+          document.getElementById('feedback').innerHTML = '';
+        }
       });
     }
 
-    function showResult(state) {
-      const a = state.paires?.[playerId];
-      const m = state.votes?.[playerId];
-      const ac = state.votes?.[a];
-      if (!m || !ac) return;
-
-      const payoffSelf = payoffs[m + ac] || 0;
-      const advName = state.names?.[a] || `ID ${a}`;
-      document.getElementById('feedback').innerHTML = `
-        <strong>Vous : ${payoffSelf} pts</strong> | 
-        <strong>${advName} : ${payoffs[ac + m] || 0} pts</strong><br>
-        <small>Total : ${(state.scores?.[playerId]?.total || 0) + payoffSelf} pts</small>
-      `;
+    // --- Voter ---
+    function vote(choice) {
+      db.ref(`game/votes/${playerId}`).set(choice);
     }
 
-    function updateProgress(state, config) {
-      const p = ((state.round || 1) - 1) / config.rounds * 100;
+    // --- Barre de progression ---
+    function updateProgress(current, total) {
+      const p = ((current - 1) / total) * 100;
       document.getElementById('progressBar').style.width = p + '%';
     }
 
