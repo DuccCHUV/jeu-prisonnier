@@ -133,46 +133,34 @@ async function saveConfig(){
   document.getElementById('status').innerHTML=`<strong style="color:#9b59b6">Configuration OK.</strong>`;
 }
 
-// ================== Round ==================
-async function nextRoundLogic(){
+// ================== Lancer le round (manuel) ==================
+async function startRound(){
   const snap = await db.ref('game').once('value');
   const game = snap.val();
-  if(!game) return;
+  if(!game || game.roundStarted) return;
 
-  if(!game.roundStarted){
-    await db.ref('game').update({ 
-      roundStarted: true, 
-      roundActive: true,
-      currentRound: game.round,
-      votes: {} 
-    });
-    document.getElementById('roundControlBtn').innerText="Passer au round suivant";
-    document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${game.round} lancé !</strong>`;
-    return;
-  }
+  await db.ref('game').update({ 
+    roundStarted: true, 
+    roundActive: true,
+    currentRound: game.round,
+    votes: {} 
+  });
+  document.getElementById('roundControlBtn').innerText="En attente des votes...";
+  document.getElementById('roundControlBtn').disabled = true;
+  document.getElementById('status').innerHTML=`<strong style="color:#2ecc71">Round ${game.round} lancé !</strong>`;
+}
 
-  // Calcul points round
-  const updates = {};
-  for(let i in game.votes){
-    const a = game.paires[i];
-    const m = game.votes[i]; if(!m) continue;
-    const ac = game.votes[a] || '—';
-    const p = payoffs[m+ac]||0;
-    updates[`scores/${i}/round`] = p;
-    updates[`scores/${i}/total`] = (game.scores[i]?.total||0) + p;
-  }
-  await db.ref('game').update(updates);
+// ================== Passer au round suivant (manuel) ==================
+async function nextRound(){
+  const snap = await db.ref('game').once('value');
+  const game = snap.val();
+  if(!game || game.roundStarted) return;
 
   const nextRoundNum = game.round + 1;
   const configSnap = await db.ref('config/rounds').once('value');
   const totalRounds = configSnap.val();
 
   if (game.round >= totalRounds) {
-    await db.ref('game').update({ 
-      roundStarted: false, 
-      roundActive: false, 
-      votes: {} 
-    });
     document.getElementById('roundControlBtn').innerText="Fin"; 
     document.getElementById('roundControlBtn').disabled=true;
     alert("Jeu terminé !");
@@ -186,8 +174,41 @@ async function nextRoundLogic(){
     roundActive: false,
     votes: {}
   });
+  document.getElementById('roundControlBtn').innerText="Lancer Round";
+  document.getElementById('roundControlBtn').disabled = false;
 }
-document.getElementById('roundControlBtn').addEventListener('click', nextRoundLogic);
+
+// ================== Calcul auto des points quand tous ont voté ==================
+async function autoCalculatePoints(){
+  const gameSnap = await db.ref('game').once('value');
+  const game = gameSnap.val();
+  const configSnap = await db.ref('config/players').once('value');
+  const totalPlayers = configSnap.val();
+
+  let votesCount = 0;
+  for(let i=1; i<=totalPlayers; i++){
+    if(game.votes?.[i]) votesCount++;
+  }
+
+  if (votesCount === totalPlayers && game.roundStarted) {
+    const updates = {};
+    for(let i in game.votes){
+      const a = game.paires[i];
+      const m = game.votes[i]; if(!m) continue;
+      const ac = game.votes[a] || '—';
+      const p = payoffs[m+ac]||0;
+      updates[`scores/${i}/round`] = p;
+      updates[`scores/${i}/total`] = (game.scores[i]?.total||0) + p;
+    }
+    await db.ref('game').update(updates);
+    await db.ref('game').update({ roundStarted: false, roundActive: false });
+    
+    // Bouton prêt pour le round suivant
+    document.getElementById('roundControlBtn').innerText="Passer au round suivant";
+    document.getElementById('roundControlBtn').disabled = false;
+    document.getElementById('roundControlBtn').onclick = nextRound;
+  }
+}
 
 // ================== Reset ==================
 function resetAll(){
@@ -196,16 +217,17 @@ function resetAll(){
   document.getElementById('status').innerHTML=`<strong style="color:#e74c3c">Réinitialisé !</strong>`;
   document.getElementById('roundControlBtn').innerText="Lancer Round";
   document.getElementById('roundControlBtn').disabled=true;
+  document.getElementById('roundControlBtn').onclick = null;
   if(scoresChart) scoresChart.destroy();
 }
 
-// ================== Update tableau + graphique ==================
+// ================== Écoute Firebase + Auto-calcul ==================
 db.ref().on('value', snap => {
   const data = snap.val() || {};
   const config = data.config || {};
   const game = data.game || {};
 
-  // Tableau
+  // --- Tableau ---
   const tbody = document.getElementById('resultsTable'); tbody.innerHTML='';
   let votesCount = 0;
   for(let i=1; i<=config.players; i++){
@@ -216,20 +238,45 @@ db.ref().on('value', snap => {
   }
 
   const btn = document.getElementById('roundControlBtn');
-  if(game.round >= config.rounds){ 
-    btn.innerText="Fin"; btn.disabled=true; 
-  }
-  else if(!game.roundStarted){ 
-    btn.innerText="Lancer Round"; btn.disabled=false; 
-  }
-  else { 
-    btn.innerText="Passer au round suivant"; 
-    btn.disabled = votesCount < config.players; 
+
+  // --- Gestion du bouton ---
+  if (game.round >= config.rounds) {
+    btn.innerText = "Fin"; 
+    btn.disabled = true;
+    btn.onclick = null;
+  } 
+  else if (!game.roundStarted && !game.roundActive) {
+    btn.innerText = "Lancer Round";
+    btn.disabled = false;
+    btn.onclick = startRound;
+  } 
+  else if (game.roundStarted) {
+    btn.innerText = `En attente... (${votesCount}/${config.players})`;
+    btn.disabled = true;
+    btn.onclick = null;
+  } 
+  else {
+    btn.innerText = "Passer au round suivant";
+    btn.disabled = false;
+    btn.onclick = nextRound;
   }
 
-  document.getElementById('votesStatus').innerText = game.roundStarted ? `${votesCount}/${config.players} votes` : "En attente du lancement";
+  // --- Status ---
+  document.getElementById('votesStatus').innerText = game.roundStarted 
+    ? `${votesCount}/${config.players} votes` 
+    : (game.roundActive ? "Round en cours..." : "En attente du lancement");
 
-  // Graphique
+  // --- AUTO CALCUL SI TOUS ONT VOTÉ ---
+  if (game.roundStarted && votesCount === config.players && config.players > 0) {
+    if (!window.calculating) {
+      window.calculating = true;
+      setTimeout(() => {
+        autoCalculatePoints().finally(() => window.calculating = false);
+      }, 1000); // 1s pour voir les votes
+    }
+  }
+
+  // --- Graphique ---
   const ctx = document.getElementById('scoresChart').getContext('2d');
   const labels = []; const points = [];
   const colors = ['#4a90e2','#2ecc71','#f39c12','#e74c3c','#9b59b6','#1abc9c','#34495e','#e67e22','#27ae60','#8e44ad'];
